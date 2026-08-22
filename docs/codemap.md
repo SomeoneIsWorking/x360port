@@ -15,7 +15,8 @@ Status vocabulary: **verified-synthetic** means built and falsified by synthetic
 | Guest module API | **verified-synthetic** | `include/xenon_host/guest_module.hpp`, `GuestModule` | Connect a locally generated exact title bridge without adding generated files here. |
 | Title adapter API | **verified-synthetic** | `include/xenon_host/title_adapter.hpp`, `TitleAdapter` | First consumer must supply real capability and import implementations. |
 | Contract validation | **verified-synthetic** | `src/module_validation.cpp`, `ValidateModule` | Re-verify against the first real generated manifest. |
-| Host composition | **verified-synthetic** | `src/host.cpp`, `Host::Run` | No lifecycle beyond validated adapter entry exists yet. |
+| Guest memory | **verified-synthetic** | `include/xenon_host/guest_memory.hpp`, `GuestMemory`; `src/guest_memory.cpp`, `GuestMemoryLoader::Load` | Real Linux and sanitizer tests reserve a 32-byte-aligned 4 GiB window, commit/load the exact image pages, and falsify range/reserve/alignment/commit failures. Physical aliases and heaps remain absent. |
+| Host composition | **verified-synthetic** | `src/host.cpp`, `Host::Run` | Owns guest memory through adapter entry; no lifecycle beyond that validated entry exists yet. |
 | SHA-256/canonical manifests | **verified-synthetic** | `src/digest.cpp`, `HashBytes` | Canonical forms cover guest addresses and library/ordinal/name imports. |
 | Mechanical gates | **verified-synthetic** | `tools/check_structure.py`, ctest `structure` | Enforces 500-line ownership and rejects generated/title dependencies in shared product code. |
 | Kernel services | **absent** | capability `KernelServices` | Add only evidenced services with trapping unknown imports. |
@@ -26,10 +27,10 @@ Status vocabulary: **verified-synthetic** means built and falsified by synthetic
 ## Source tree
 
 ```text
-include/  —  249 lines, 3 files
-└─ xenon_host/  249 lines, 3 files  # public GuestModule, TitleAdapter, and Host interfaces
-src/      —  487 lines, 4 files     # digest, validation, and composition implementations
-tests/    —  309 lines, 1 file      # synthetic acceptance and every named refusal path
+include/  —  322 lines, 4 files
+└─ xenon_host/  322 lines, 4 files  # public GuestModule, GuestMemory, TitleAdapter, and Host interfaces
+src/      —  783 lines, 7 files     # digest, guest-memory, validation, and composition implementations
+tests/    —  551 lines, 2 files     # contract refusals plus real virtual-memory load/translation tests
 tools/    —  105 lines, 1 file      # mechanical source-structure/dependency gate
 docs/                # project coverage map
 ```
@@ -39,5 +40,8 @@ docs/                # project coverage map
 - Exact module acceptance/refusal: `src/module_validation.cpp`, `ValidateModule`
 - Exact import binding coverage: `src/module_validation.cpp`, `ValidateImports`
 - Final pre-entry capability gate: `src/host.cpp`, `Host::Run`
+- 4 GiB ABI window and bounded translation: `include/xenon_host/guest_memory.hpp`, `GuestMemory`
+- Image load: `src/guest_memory.cpp`, `GuestMemoryLoader::Load`
+- POSIX reservation and commit: `src/guest_memory_posix.cpp`, `GuestMemoryLoader::PlatformOperations`
 - Opaque generated-code seam: `include/xenon_host/guest_module.hpp`, `GuestEntryThunk`
 - Contract falsifier: `tests/contract_tests.cpp`

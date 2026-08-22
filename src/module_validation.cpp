@@ -21,11 +21,6 @@ constexpr std::uint32_t AllCapabilityBits = static_cast<std::uint32_t>(Capabilit
     return {.error = error, .detail = std::move(detail)};
 }
 
-[[nodiscard]] bool IsZeroDigest(const Sha256Digest& digest) noexcept
-{
-    return std::ranges::all_of(digest, [](std::uint8_t byte) { return byte == 0; });
-}
-
 [[nodiscard]] bool IsInside(GuestAddress address, CodeRange range) noexcept
 {
     const std::uint64_t begin = range.base;
@@ -87,31 +82,18 @@ bool IsValidCapabilitySet(CapabilitySet capabilities) noexcept
     return (capabilities.Bits() & ~AllCapabilityBits) == 0;
 }
 
-RunResult ValidateModule(const GuestModule& module) noexcept
+RunResult ValidateModule(const GuestModule& module, const GuestMemory& memory) noexcept
 {
     const ModuleDescriptor& descriptor = module.Descriptor();
-    const std::span<const std::byte> image = module.ImageBytes();
-    if (IsZeroDigest(descriptor.image.sha256))
+    if (descriptor.image.sha256 != memory.Identity().sha256 ||
+        descriptor.image.base != memory.Identity().base ||
+        descriptor.image.size != memory.Identity().size)
     {
-        return Refuse(RunError::InvalidImageDigest, "expected image SHA-256 is zero");
-    }
-    if (descriptor.image.size != image.size())
-    {
-        return Refuse(RunError::ImageSizeMismatch,
-                      "image byte count does not equal the sealed image size");
+        return Refuse(RunError::ImageDigestMismatch,
+                      "module image identity changed after guest memory was loaded");
     }
     const std::uint64_t image_end =
         static_cast<std::uint64_t>(descriptor.image.base) + descriptor.image.size;
-    if (descriptor.image.size == 0 ||
-        image_end > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) + 1U)
-    {
-        return Refuse(RunError::ImageAddressOverflow,
-                      "image range is empty or exceeds 32-bit space");
-    }
-    if (HashBytes(image) != descriptor.image.sha256)
-    {
-        return Refuse(RunError::ImageDigestMismatch, "image bytes do not match the sealed SHA-256");
-    }
 
     const CodeRange code = descriptor.code;
     const std::uint64_t code_end = static_cast<std::uint64_t>(code.base) + code.size;
