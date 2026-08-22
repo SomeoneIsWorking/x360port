@@ -1,5 +1,6 @@
 #include "xenon_host/host.hpp"
 
+#include "host_run.hpp"
 #include "module_validation.hpp"
 
 #include <array>
@@ -8,6 +9,12 @@ namespace xenon_host
 {
 
 RunResult Host::Run(TitleAdapter& adapter, RunRequest request) noexcept
+{
+    return HostRunner::Run(adapter, request, GuestMemoryLoader::PlatformOperations());
+}
+
+RunResult HostRunner::Run(TitleAdapter& adapter, RunRequest request,
+                          const GuestVirtualMemoryOps& operations) noexcept
 {
     if (!IsPortableKey(adapter.TitleKey()))
     {
@@ -30,7 +37,37 @@ RunResult Host::Run(TitleAdapter& adapter, RunRequest request) noexcept
     }
 
     const GuestModule& module = adapter.Module();
-    if (RunResult result = ValidateModule(module); !result)
+    GuestMemoryLoadResult loaded =
+        GuestMemoryLoader::Load(module.Descriptor().image, module.ImageBytes(), operations);
+    if (!loaded)
+    {
+        switch (loaded.error)
+        {
+        case GuestMemoryLoadError::InvalidImageDigest:
+            return {.error = RunError::InvalidImageDigest, .detail = std::string(loaded.detail)};
+        case GuestMemoryLoadError::ImageSizeMismatch:
+            return {.error = RunError::ImageSizeMismatch, .detail = std::string(loaded.detail)};
+        case GuestMemoryLoadError::ImageAddressOverflow:
+            return {.error = RunError::ImageAddressOverflow, .detail = std::string(loaded.detail)};
+        case GuestMemoryLoadError::ReservationFailed:
+            return {.error = RunError::GuestMemoryReservationFailed,
+                    .detail = std::string(loaded.detail)};
+        case GuestMemoryLoadError::InvalidWindowAlignment:
+            return {.error = RunError::InvalidGuestMemoryAlignment,
+                    .detail = std::string(loaded.detail)};
+        case GuestMemoryLoadError::CommitFailed:
+            return {.error = RunError::GuestMemoryCommitFailed,
+                    .detail = std::string(loaded.detail)};
+        case GuestMemoryLoadError::ImageDigestMismatch:
+            return {.error = RunError::ImageDigestMismatch, .detail = std::string(loaded.detail)};
+        case GuestMemoryLoadError::None:
+            break;
+        }
+        return {.error = RunError::GuestMemoryReservationFailed,
+                .detail = "guest memory load failed without a named cause"};
+    }
+    GuestMemory& memory = loaded.memory;
+    if (RunResult result = ValidateModule(module, memory); !result)
     {
         return result;
     }
@@ -39,7 +76,7 @@ RunResult Host::Run(TitleAdapter& adapter, RunRequest request) noexcept
         return result;
     }
 
-    AdapterRunResult adapter_result = adapter.Enter(ValidatedGuestModule(module));
+    AdapterRunResult adapter_result = adapter.Enter(ValidatedGuestModule(module, memory));
     if (!adapter_result.entered_guest)
     {
         return {.error = RunError::AdapterRefused,
@@ -64,6 +101,9 @@ std::string_view ToString(RunError error) noexcept
         "invalid-image-digest",
         "image-size-mismatch",
         "image-address-overflow",
+        "guest-memory-reservation-failed",
+        "invalid-guest-memory-alignment",
+        "guest-memory-commit-failed",
         "image-digest-mismatch",
         "invalid-code-range",
         "entry-point-outside-code",

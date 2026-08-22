@@ -6,7 +6,8 @@
 namespace xenon_host
 {
 
-[[nodiscard]] RunResult ValidateModule(const GuestModule& module) noexcept;
+[[nodiscard]] RunResult ValidateModule(const GuestModule& module,
+                                       const GuestMemory& memory) noexcept;
 [[nodiscard]] RunResult ValidateImports(const GuestModule& module,
                                         std::span<const ImportBinding> bindings) noexcept;
 [[nodiscard]] bool IsPortableKey(std::string_view key) noexcept;

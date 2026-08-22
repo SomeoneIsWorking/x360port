@@ -17,12 +17,15 @@ find_program(CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
 
 set(XENON_HOST_SOURCES
     src/digest.cpp
+    src/guest_memory.cpp
+    src/guest_memory_posix.cpp
     src/host.cpp
     src/module_validation.cpp
 )
 
 set(XENON_HOST_PUBLIC_HEADERS
     include/xenon_host/guest_module.hpp
+    include/xenon_host/guest_memory.hpp
     include/xenon_host/host.hpp
     include/xenon_host/title_adapter.hpp
 )
@@ -37,13 +40,23 @@ enable_testing()
 add_executable(xenon_host_contract_tests tests/contract_tests.cpp)
 target_link_libraries(xenon_host_contract_tests PRIVATE xenon_host)
 target_compile_options(xenon_host_contract_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_include_directories(xenon_host_contract_tests PRIVATE src)
 add_test(NAME contract COMMAND xenon_host_contract_tests)
+
+add_executable(xenon_host_guest_memory_tests tests/guest_memory_tests.cpp)
+target_link_libraries(xenon_host_guest_memory_tests PRIVATE xenon_host)
+target_compile_options(xenon_host_guest_memory_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_include_directories(xenon_host_guest_memory_tests PRIVATE src)
+add_test(NAME guest_memory COMMAND xenon_host_guest_memory_tests)
 
 set(XENON_HOST_FORMAT_FILES
     ${XENON_HOST_SOURCES}
     ${XENON_HOST_PUBLIC_HEADERS}
     src/module_validation.hpp
+    src/guest_memory_load.hpp
+    src/host_run.hpp
     tests/contract_tests.cpp
+    tests/guest_memory_tests.cpp
 )
 
 add_test(
@@ -60,6 +73,7 @@ add_test(
         --warnings-as-errors=*
         ${XENON_HOST_SOURCES}
         tests/contract_tests.cpp
+        tests/guest_memory_tests.cpp
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

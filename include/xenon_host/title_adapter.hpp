@@ -1,7 +1,7 @@
 #ifndef XENON_HOST_TITLE_ADAPTER_HPP
 #define XENON_HOST_TITLE_ADAPTER_HPP
 
-#include "xenon_host/guest_module.hpp"
+#include "xenon_host/guest_memory.hpp"
 
 #include <cstdint>
 #include <span>
@@ -71,13 +71,20 @@ class ValidatedGuestModule
 {
   public:
     [[nodiscard]] const GuestModule& Module() const noexcept { return *module_; }
+    [[nodiscard]] GuestMemory& Memory() noexcept { return *memory_; }
+    [[nodiscard]] const GuestMemory& Memory() const noexcept { return *memory_; }
 
   private:
-    explicit ValidatedGuestModule(const GuestModule& module) noexcept : module_(&module) {}
+    explicit ValidatedGuestModule(const GuestModule& module, GuestMemory& memory) noexcept
+        : module_(&module), memory_(&memory)
+    {
+    }
 
     const GuestModule* module_;
+    GuestMemory* memory_;
 
     friend class Host;
+    friend class HostRunner;
 };
 
 struct AdapterRunResult

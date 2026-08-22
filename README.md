@@ -7,6 +7,8 @@ entry thunks, its import requirements, and the host capabilities it genuinely im
 The host validates the whole bundle before guest entry:
 
 - exact image byte count, 32-bit layout, entry point, and SHA-256;
+- a 32-byte-aligned 4 GiB virtual guest window, with only the sealed image range initially committed
+  and loaded at its full 32-bit guest address;
 - exact aligned code range and strictly sorted address-to-thunk map, including its count and digest;
 - exact sorted library/ordinal import manifest, including its count and digest;
 - exact one-for-one non-null host bindings for that manifest; and
@@ -36,4 +38,7 @@ portable ABI types from `ppc_abi.h` while retaining layout and lookup data in ge
 
 The title adapter must bind every import and advertise only real capabilities. `RunRequest` always
 requires guest memory by default; add every other capability needed for a run. `Host::Run` refuses
-before guest entry if any are absent.
+before guest entry if any are absent. `ValidatedGuestModule::Memory()` exposes the live
+`GuestMemory`; generated entry thunks receive `GuestMemory::WindowBase()`, while native services use
+the overflow-checked `Translate(GuestMemoryRange)` seam. Physical-memory aliases and guest heaps are
+not implemented yet and must not be inferred from the image mapping.

@@ -1,5 +1,8 @@
 #include "xenon_host/host.hpp"
 
+#include "host_run.hpp"
+
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -102,6 +105,13 @@ class SyntheticAdapter final : public TitleAdapter
         {
             return {.refusal = "validated token named the wrong module"};
         }
+        const GuestMemory& memory = validated.Memory();
+        if (memory.Identity().base != module.descriptor.image.base ||
+            memory.ImageBytes().size() != module.image.size() ||
+            !std::ranges::equal(memory.ImageBytes(), module.image))
+        {
+            return {.refusal = "validated guest memory did not contain the exact module image"};
+        }
         if (refuse_entry)
         {
             return {.refusal = "synthetic adapter refusal"};
@@ -180,6 +190,52 @@ void TestAcceptance()
                      result.guest_exit_code, fixture.adapter.entry_calls, result.detail.c_str());
         ++failures;
     }
+}
+
+[[nodiscard]] std::byte* RefuseReservation(std::uint64_t) noexcept { return nullptr; }
+
+[[nodiscard]] std::byte* MisalignedReservation(std::uint64_t) noexcept
+{
+    return reinterpret_cast<std::byte*>(0x21U);
+}
+
+alignas(GuestMemory::RequiredAlignment) std::array<std::byte, 32> fake_window{};
+
+[[nodiscard]] std::byte* FakeReservation(std::uint64_t) noexcept { return fake_window.data(); }
+
+[[nodiscard]] bool RefuseCommit(std::byte*, GuestMemoryRange) noexcept { return false; }
+
+void IgnoreRelease(std::byte*, std::uint64_t) noexcept {}
+
+void TestGuestMemoryHostRefusals()
+{
+    const auto expect_refusal = [](RunError expected, const GuestVirtualMemoryOps& operations)
+    {
+        Fixture fixture;
+        ++checks;
+        covered_errors[static_cast<std::size_t>(expected)] = true;
+        const RunResult result = HostRunner::Run(fixture.adapter, fixture.request, operations);
+        if (result.error != expected || result.detail.empty() || fixture.adapter.entry_calls != 0)
+        {
+            std::fprintf(stderr,
+                         "FAIL guest memory host refusal: expected=%.*s error=%.*s calls=%d "
+                         "detail=%s\n",
+                         static_cast<int>(ToString(expected).size()), ToString(expected).data(),
+                         static_cast<int>(ToString(result.error).size()),
+                         ToString(result.error).data(), fixture.adapter.entry_calls,
+                         result.detail.c_str());
+            ++failures;
+        }
+    };
+
+    expect_refusal(
+        RunError::GuestMemoryReservationFailed,
+        {.reserve = RefuseReservation, .commit = RefuseCommit, .release = IgnoreRelease});
+    expect_refusal(
+        RunError::InvalidGuestMemoryAlignment,
+        {.reserve = MisalignedReservation, .commit = RefuseCommit, .release = IgnoreRelease});
+    expect_refusal(RunError::GuestMemoryCommitFailed,
+                   {.reserve = FakeReservation, .commit = RefuseCommit, .release = IgnoreRelease});
 }
 
 void TestRunErrorCoverage()
@@ -298,12 +354,13 @@ int main()
     TestSha256KnownAnswer();
     TestAcceptance();
     TestRefusals();
+    TestGuestMemoryHostRefusals();
     TestRunErrorCoverage();
     if (failures != 0)
     {
         std::fprintf(stderr, "%d failure(s) across %d contract checks\n", failures, checks);
         return 1;
     }
-    std::printf("%d checks passed (SHA-256 KAT, 1 acceptance, 25 refusal paths)\n", checks);
+    std::printf("%d checks passed (SHA-256 KAT, 1 acceptance, 28 refusal paths)\n", checks);
     return 0;
 }
