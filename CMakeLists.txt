@@ -31,6 +31,7 @@ add_library(xenon_host STATIC ${XENON_HOST_SOURCES} ${XENON_HOST_PUBLIC_HEADERS}
 target_include_directories(xenon_host PUBLIC include)
 target_compile_options(xenon_host PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 enable_testing()
 
 add_executable(xenon_host_contract_tests tests/contract_tests.cpp)
@@ -73,4 +74,4 @@ add_test(
     COMMAND ${Python3_EXECUTABLE} tools/check_structure.py --selftest
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
+endif()
