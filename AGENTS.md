@@ -23,6 +23,7 @@ The generated Xenon ABI indexes `window_base + full_32_bit_guest_address`; never
 reservation with an exact-size image allocation or derive a pointer before the image base. Physical
 RAM aliases and guest heaps are separate future owners, not implicit behavior of image loading.
 
-Build only with Clang. Run the full CTest suite, including format, clang-tidy, contract refusal
+Develop and test with Clang (AppleClang included); other compilers configure with a warning, not a
+ban. Run the full CTest suite, including format, clang-tidy, contract refusal
 coverage, and the 500-line structure gate. Project automation is Python; this library has no
 `run.sh` because it is not a runnable product.

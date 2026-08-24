@@ -2,8 +2,13 @@ cmake_minimum_required(VERSION 3.25)
 
 project(xenon_host VERSION 0.1.0 LANGUAGES CXX)
 
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    message(FATAL_ERROR "xenon-host requires clang++; configured compiler is ${CMAKE_CXX_COMPILER_ID}")
+# Clang is what this library is developed and tested with; AppleClang counts
+# as Clang. Another compiler warns rather than bans -- a fresh machine must
+# not have to install a specific vendor to try this library.
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(WARNING
+            "xenon-host is tested with clang++; configured compiler is "
+            "${CMAKE_CXX_COMPILER_ID}, which has not been tested. Proceeding.")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
