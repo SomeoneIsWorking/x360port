@@ -9,6 +9,9 @@
 - Non-native guest code executes only through Xenia's x64/A64 dynarecs and
   reports nonzero translated-block work; no gameplay interpreter is linked or
   selectable.
+- The A64 dynarec is qualified independently on Apple Silicon macOS and Android
+  arm64-v8a, including executable memory, instruction-cache coherence, ABI
+  transitions, exception/signal behavior, and packaging.
 - Authenticated module loading, typed imports, device-memory callbacks,
   image-aware overrides, scoped original calls, bounded exits, and executable
   invalidation are exercised at the production boundary.
