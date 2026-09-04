@@ -15,4 +15,4 @@ Independent SHA-256 abc and canonical import-manifest known answers, plus six mu
 
 ## Known failure modes
 
-This instrument exercises the standalone static-host boundary with synthetic descriptors. It cannot establish Xenia `RawModule` integration, dynarec execution, override dispatch, or representative gameplay. Port retained image/import discriminators to xenonport; do not use generated-map/ABI results as product evidence.
+This instrument exercises the standalone static-host boundary with synthetic descriptors. It cannot establish Xenia `RawModule` integration, dynarec execution, override dispatch, or representative gameplay. Port retained image/import discriminators to x360port; do not use generated-map/ABI results as product evidence.

@@ -9,7 +9,7 @@ depends: include/xenon_host/guest_memory.hpp#GuestMemory, src/guest_memory.cpp#G
 
 ## Claim
 
-The current static-host prototype supplies its generated ABI with a 32-byte-aligned 4 GiB virtual window, loads the sealed image at its full guest address, bounds native translation without overflow, and refuses reserve/alignment/commit failures before generated entry. This is historical generated-ABI evidence, not a requirement for xenonport.
+The current static-host prototype supplies its generated ABI with a 32-byte-aligned 4 GiB virtual window, loads the sealed image at its full guest address, bounds native translation without overflow, and refuses reserve/alignment/commit failures before generated entry. This is historical generated-ABI evidence, not a requirement for x360port.
 
 ## Evidence
 
@@ -17,4 +17,4 @@ Clang normal and ASan/UBSan CTest suites both passed 6/6; guest_memory exercised
 
 ## What would falsify it
 
-The cited implementation or tests no longer reproduce the recorded generated-ABI behavior. Deleting this contract during retirement does not falsify the historical result; xenonport uses Xenia's memory ownership and preserves only independently required mapping facts.
+The cited implementation or tests no longer reproduce the recorded generated-ABI behavior. Deleting this contract during retirement does not falsify the historical result; x360port uses Xenia's memory ownership and preserves only independently required mapping facts.

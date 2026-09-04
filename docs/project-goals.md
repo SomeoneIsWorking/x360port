@@ -1,6 +1,6 @@
 # Project goals
 
-## G001 — Transfer reusable Xbox 360 validation contracts to xenonport
+## G001 — Transfer reusable Xbox 360 validation contracts to x360port
 
 ### Why
 
@@ -10,7 +10,7 @@ them, not in a static-host library.
 
 ### Success conditions
 
-- `shared/xenonport` validates exact image identity/layout through Xenia
+- `shared/x360port` validates exact image identity/layout through Xenia
   `RawModule` before title policy or guest entry.
 - It validates canonical typed function and variable imports, including
   kind/library/ordinal/name/guest-address/record-address identity and callback
@@ -39,7 +39,7 @@ the ownership split the migration is intended to eliminate.
 
 ### Success conditions
 
-- Equivalent xenonport tests re-prove every transferred invariant and its
+- Equivalent x360port tests re-prove every transferred invariant and its
   negative discriminator.
 - Generated-only contracts and tests are explicitly retired rather than copied.
 - If no independent owner remains, the separate repository and all consumer

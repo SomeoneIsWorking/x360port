@@ -4,14 +4,14 @@
 
 The baseline is the current standalone `xenon-host` prototype for statically
 generated Xbox 360 guest code. The target workflow embeds Xenia through
-`shared/xenonport`, retains the useful image/import validation contracts there,
+`shared/x360port`, retains the useful image/import validation contracts there,
 and removes this separate repository when it has no independent owner.
 
 | ID | Capability | State | Dependencies | Goals |
 |---|---|---|---|---|
 | S001 | Authenticated image identity/layout contract is synthetically falsified | verified | — | G001 |
 | S002 | Typed import manifest and callback-shape contract is synthetically falsified | verified | — | G001 |
-| S003 | Image/import contracts are integrated and re-proven in xenonport | missing | S001, S002 | G001, G002 |
+| S003 | Image/import contracts are integrated and re-proven in x360port | missing | S001, S002 | G001, G002 |
 | S004 | Generated function-map and static ABI contracts are retired | missing | S003 | G001, G002 |
 | S005 | Separate xenon-host repository and consumer references are removed | missing | S003, S004 | G002 |
 
@@ -19,7 +19,7 @@ and removes this separate repository when it has no independent owner.
 
 S003 is the current focus. Preserve the current dirty code and evidence while
 moving only the independently reusable authenticated-image and typed-import
-contracts to xenonport. Do not add new consumers or extend the static host.
+contracts to x360port. Do not add new consumers or extend the static host.
 
 ## Capability details
 
@@ -36,9 +36,9 @@ import fields, distinct handler/resolver callback shapes, one accepted bundle,
 and negative mutations. These facts transfer; the generated function-map digest
 does not.
 
-### S003 — xenonport integration
+### S003 — x360port integration
 
-Missing capability: `shared/xenonport` does not yet exist, so neither contract
+Missing capability: `shared/x360port` does not yet exist, so neither contract
 has a runtime Xenia owner or real-module evidence.
 
 Gap: Integrate with Xenia `Memory`, `Processor`, `ThreadState`, and `RawModule`,
