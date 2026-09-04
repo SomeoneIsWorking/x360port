@@ -5,32 +5,37 @@ Xenon decoding, its x64/A64 dynamic recompilers, executable memory, guest
 memory, and translated-block caching. This package owns only the narrow
 embedding contracts shared by title ports.
 
-The first executable slice is a bounded, single-instance Xenia context owning
+The executable slice is a bounded, single-instance Xenia context owning
 `Memory`, `Processor`, `ThreadState`, and `RawModule`. It validates an exact
-image and import manifest before committing guest memory, maps one import-free
-raw image at its authenticated address, translates PPC on demand with Xenia's
-host dynarec, and calls the cached host code. The runtime test executes a real
-two-instruction PPC leaf and requires nonzero emitted host code.
+image and import manifest before committing guest memory, maps one raw image at
+its authenticated address, binds typed function and variable imports through
+Xenia's production export machinery, translates PPC on demand with Xenia's host
+dynarec, and calls the cached host code. The runtime test executes a real PPC
+leaf plus guest calls and loads through both import kinds, and requires nonzero
+emitted host code.
 
-The runtime deliberately refuses non-empty import manifests until typed
-function and variable callbacks are attached to Xenia's export machinery. It
-has no interpreter, generated-code, or fallback executor. x86-64 is verified;
-Xenia's A64 backend is selected on arm64 hosts but remains unqualified on Apple
-Silicon and Android.
+It has no interpreter, generated-code, or fallback executor. x86-64 Linux is
+locally verified. CI executes the same synthetic runtime contract on Linux
+x86-64, Windows x86-64, and Apple Silicon macOS; a job fails if its runner does
+not have the declared architecture. Android arm64-v8a remains unsupported
+because there is no APK/runtime packaging owner capable of executing this
+contract on an Android runner yet; no compile-only Android job claims runtime
+support.
 
-Configure against the exact pinned Xenia checkout and build with Ninja:
+Use the locked canonical verifier against the exact pinned Xenia checkout:
 
 ```console
-cmake -S . -B build/runtime -G Ninja \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-  -DX360PORT_XENIA_SOURCE_DIR=/path/to/xenia
-cmake --build build/runtime --target x360port_runtime_tests
-ctest --test-dir build/runtime --output-on-failure
+uv run --frozen python tools/verify.py --xenia-source /path/to/xenia
 ```
 
+The verifier selects Clang and Ninja, refuses build output outside `build/`,
+runs Python quality checks, builds the real executor and synthetic fixtures,
+and runs CTest including clang-format, clang-tidy, structure checks, and the
+Xenia JIT/import runtime test.
+
 The required Xenia revision is
-`1150303fe1694edfc2de8c6443750952e9d5b8bc`; configuration refuses any other
+`340aeb13e62bc733b000f23a763d2c3aeda906f8` from the maintained
+`SomeoneIsWorking/xenia-canary` `main` branch; configuration refuses any other
 revision. `-DX360PORT_VALIDATION_ONLY=ON` builds only the synthetic diagnostic
 validator and never claims runtime capability.
 

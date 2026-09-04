@@ -1,5 +1,7 @@
 #include "x360port/runtime.hpp"
 
+#include "runtime_imports.hpp"
+
 #include <algorithm>
 #include <cstring>
 #include <limits>
@@ -127,6 +129,7 @@ class RuntimeContext::Impl final
             }
         }
         export_resolver_.reset();
+        imports_.reset();
         memory_.reset();
 
         if (owns_instance_)
@@ -180,6 +183,11 @@ class RuntimeContext::Impl final
     [[nodiscard]] RuntimeFailure LoadModule(const GuestModule& module,
                                             std::span<const ImportBinding> bindings)
     {
+        if (load_failed_)
+        {
+            return Failure(RuntimeError::LoadStateInvalid,
+                           "a previous import/module attachment failed; recreate the context");
+        }
         if (module_ != nullptr)
         {
             return Failure(RuntimeError::ModuleAlreadyLoaded,
@@ -200,10 +208,11 @@ class RuntimeContext::Impl final
                            std::string(ToString(import_validation.error)) + ": " +
                                import_validation.detail);
         }
-        if (!bindings.empty())
+        RuntimeImportsCreateResult staged_imports =
+            RuntimeImports::Create(module.ImportManifest(), bindings);
+        if (!staged_imports)
         {
-            return Failure(RuntimeError::RuntimeImportsNotImplemented,
-                           "typed imports validate but are not yet attached to Xenia exports");
+            return std::move(staged_imports.failure);
         }
 
         const ModuleDescriptor& descriptor = module.Descriptor();
@@ -225,11 +234,36 @@ class RuntimeContext::Impl final
         raw_module->set_name("x360port-authenticated-image");
         raw_module->set_executable(true);
         raw_module->SetAddressRange(descriptor.code.base, descriptor.code.size);
-        auto* registered_module = raw_module.get();
-        if (!processor_->AddModule(std::move(raw_module)))
+        imports_ = std::move(staged_imports.imports);
+        RuntimeFailure import_failure;
+        try
         {
-            return Failure(RuntimeError::ModuleRegistrationFailed,
-                           "Xenia refused the authenticated RawModule registration");
+            import_failure = imports_->Attach(*export_resolver_, *raw_module, *memory_);
+        }
+        catch (...)
+        {
+            load_failed_ = true;
+            throw;
+        }
+        if (import_failure)
+        {
+            load_failed_ = true;
+            return import_failure;
+        }
+        auto* registered_module = raw_module.get();
+        try
+        {
+            if (!processor_->AddModule(std::move(raw_module)))
+            {
+                load_failed_ = true;
+                return Failure(RuntimeError::ModuleRegistrationFailed,
+                               "Xenia refused the authenticated RawModule registration");
+            }
+        }
+        catch (...)
+        {
+            load_failed_ = true;
+            throw;
         }
         module_ = registered_module;
         code_range_ = descriptor.code;
@@ -299,10 +333,12 @@ class RuntimeContext::Impl final
 
   private:
     bool owns_instance_ = false;
+    bool load_failed_ = false;
     std::unique_ptr<xe::Memory> memory_;
     std::unique_ptr<xe::cpu::ExportResolver> export_resolver_;
     std::unique_ptr<xe::cpu::Processor> processor_;
     std::unique_ptr<xe::cpu::ThreadState> thread_state_;
+    std::unique_ptr<RuntimeImports> imports_;
     xe::cpu::RawModule* module_ = nullptr;
     CodeRange code_range_{};
     std::uint32_t stack_address_ = 0;
@@ -359,8 +395,12 @@ std::string_view ToString(RuntimeError error) noexcept
         return "module validation failed";
     case RuntimeError::ImportValidationFailed:
         return "import validation failed";
-    case RuntimeError::RuntimeImportsNotImplemented:
-        return "runtime imports not implemented";
+    case RuntimeError::VariableResolutionFailed:
+        return "variable import resolution failed";
+    case RuntimeError::ImportAttachmentFailed:
+        return "Xenia import attachment failed";
+    case RuntimeError::LoadStateInvalid:
+        return "runtime load state invalid";
     case RuntimeError::ImageAllocationFailed:
         return "guest image allocation failed";
     case RuntimeError::ModuleRegistrationFailed:

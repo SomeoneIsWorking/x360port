@@ -15,19 +15,20 @@ static or interpreter product path.
 | S005 | Gears leaf/import/override discriminator executes through Xenia | missing | S003, S004 | G001 |
 | S006 | Xenia A64 execution is qualified on Apple Silicon macOS | missing | S003, S004 | G001 |
 | S007 | Xenia A64 execution is qualified on Android arm64-v8a | missing | S003, S004 | G001 |
-| S008 | Typed function and variable imports execute through Xenia exports | missing | S002, S003, S004 | G001, G002 |
+| S008 | Typed function and variable imports execute through Xenia exports | verified | S002, S003, S004 | G001, G002 |
 | S009 | Device-memory callbacks have a title-neutral runtime boundary | missing | S003, S004 | G001 |
 | S010 | Image-aware overrides and scoped original calls use Xenia dispatch | missing | S003, S004, S008 | G001 |
 | S011 | Guest calls have bounded exit and refusal contracts | partial | S003, S004 | G001 |
 | S012 | Executable writes invalidate Xenia translations coherently | missing | S003, S004 | G001 |
 | S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
+| S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
 
 ## Current focus
 
-S008 is the current focus. The real `x360port` target executes authenticated,
-import-free PPC through Xenia's x64 dynarec. Non-empty validated import sets are
-refused rather than silently ignored; attaching them to Xenia exports is the
-next shared runtime boundary.
+S009 is the current focus. The real `x360port` target executes authenticated PPC
+through Xenia's x64 dynarec and its typed function and variable imports cross
+Xenia's production export machinery. The next shared runtime gap is a narrow
+device-backed guest-memory callback boundary.
 
 ## Capability details
 
@@ -53,8 +54,8 @@ The teardown/recreation test reloads and executes from the same guest range.
 
 Evidence: `RuntimeContext::LoadModule` runs the retained module/import validators
 before `AllocFixed` and `RawModule::SetAddressRange`. A valid synthetic image is
-then registered as the production Xenia `RawModule`; invalid identity and
-non-empty runtime imports fail before guest memory is committed.
+then registered as the production Xenia `RawModule`; invalid identity and an
+unresolvable variable import fail before guest memory is committed.
 
 ### S005 — Gears discriminator
 
@@ -76,9 +77,13 @@ gameplay.
 
 ### S008 — typed runtime imports
 
-Missing capability: attach exact validated function and variable bindings to
-Xenia's export machinery. The runtime currently returns
-`RuntimeImportsNotImplemented` for every non-empty binding set.
+Evidence: `x360port_runtime_tests` loads an authenticated synthetic module whose
+guest PPC calls a function import and loads a variable import. The function
+crosses Xenia's real syscall thunk and typed export callback, the variable is
+published through Xenia's resolver into the guest record, and both return
+independently checked values. A null variable resolution fails before allocation
+and the same context then loads successfully; callback tables remain valid after
+the caller's manifest and binding objects leave scope.
 
 ### S009 — device-memory callbacks
 
@@ -108,3 +113,13 @@ Evidence: `x360port_runtime_tests` loads big-endian PPC `li r3, 42; blr`, requir
 Xenia to emit a non-empty host function, executes it twice, observes return 42,
 and proves the second call does not increment the translation count. The same
 test tears down and recreates the runtime before reloading the identical range.
+
+### S014 — native-host runtime CI
+
+Evidence: the locked Python verifier is the only CI entry point and requires the
+real synthetic Xenia runtime tests on a declared host architecture. Linux
+x86-64 is locally green. The pinned workflow definitions cover Linux x86-64,
+Windows x86-64, and Apple Silicon macOS, but their remote runs remain unverified
+until the dependency and consumer commits are pushed. Android is explicitly not
+represented by a placeholder job: no Android executable/package owner exists to
+run this contract on arm64-v8a yet.

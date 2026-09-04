@@ -16,7 +16,7 @@ option(X360PORT_VALIDATION_ONLY
        OFF)
 set(X360PORT_XENIA_SOURCE_DIR "" CACHE PATH
     "Path to the pinned Xenia source checkout used by the x360port executor")
-set(X360PORT_XENIA_REVISION "1150303fe1694edfc2de8c6443750952e9d5b8bc")
+set(X360PORT_XENIA_REVISION "340aeb13e62bc733b000f23a763d2c3aeda906f8")
 
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp
@@ -28,16 +28,22 @@ set(X360PORT_VALIDATION_HEADERS
     include/x360port/validation.hpp
 )
 
-# This is deliberately not named x360port: no executor target exists until
-# Xenia Memory, Processor, ThreadState, and RawModule are actually embedded.
+# Keep the validators independently buildable for diagnostic use. The runtime
+# target below is the only product executor.
 add_library(x360port_validation STATIC
     ${X360PORT_VALIDATION_SOURCES}
     ${X360PORT_VALIDATION_HEADERS})
 target_include_directories(x360port_validation PUBLIC include)
 target_compile_options(x360port_validation PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
-set(X360PORT_RUNTIME_SOURCES src/runtime.cpp)
-set(X360PORT_RUNTIME_HEADERS include/x360port/runtime.hpp)
+set(X360PORT_RUNTIME_SOURCES
+    src/runtime.cpp
+    src/runtime_imports.cpp
+)
+set(X360PORT_RUNTIME_HEADERS
+    include/x360port/runtime.hpp
+    src/runtime_imports.hpp
+)
 
 if(NOT X360PORT_VALIDATION_ONLY)
     if(NOT CMAKE_GENERATOR MATCHES "Ninja")
@@ -88,7 +94,9 @@ if(NOT X360PORT_VALIDATION_ONLY)
     # Xenia changes the GNU libstdc++ container ABI for its Debug objects. The
     # runtime constructs Xenia-owned types, so its translation unit must use the
     # same layout even though x360port's public Pimpl boundary hides those types.
-    target_compile_definitions(x360port PRIVATE $<$<CONFIG:Debug>:_GLIBCXX_DEBUG>)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_compile_definitions(x360port PRIVATE $<$<CONFIG:Debug>:_GLIBCXX_DEBUG>)
+    endif()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
         set(X360PORT_XENIA_BACKEND_TARGET xenia-cpu-backend-x64)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|ARM64|arm64)$")
@@ -97,9 +105,25 @@ if(NOT X360PORT_VALIDATION_ONLY)
         message(FATAL_ERROR
             "x360port: Xenia has no dynarec backend for ${CMAKE_SYSTEM_PROCESSOR}")
     endif()
-    target_link_libraries(x360port PUBLIC
-        x360port_validation
-        "$<LINK_GROUP:RESCAN,xenia-core,xenia-kernel,xenia-cpu,${X360PORT_XENIA_BACKEND_TARGET},xenia-gpu,xenia-patcher,xenia-ui,imgui>")
+    set(X360PORT_XENIA_LIBRARIES
+        xenia-core
+        xenia-kernel
+        xenia-cpu
+        ${X360PORT_XENIA_BACKEND_TARGET}
+        xenia-gpu
+        xenia-patcher
+        xenia-ui
+        imgui)
+    if(CMAKE_CXX_LINK_GROUP_USING_RESCAN_SUPPORTED OR
+       CMAKE_LINK_GROUP_USING_RESCAN_SUPPORTED)
+        target_link_libraries(x360port PUBLIC
+            x360port_validation
+            "$<LINK_GROUP:RESCAN,${X360PORT_XENIA_LIBRARIES}>")
+    else()
+        target_link_libraries(x360port PUBLIC
+            x360port_validation
+            ${X360PORT_XENIA_LIBRARIES})
+    endif()
 endif()
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

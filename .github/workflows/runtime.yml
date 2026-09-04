@@ -1,0 +1,75 @@
+name: Runtime
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  XENIA_REVISION: 340aeb13e62bc733b000f23a763d2c3aeda906f8
+
+jobs:
+  native-runtime:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86-64 JIT
+            os: ubuntu-24.04
+            llvm_arch: x64
+            machine: x86_64
+          - name: Windows x86-64 JIT
+            os: windows-2025
+            llvm_arch: x64
+            machine: x86_64
+          - name: macOS arm64 JIT
+            os: macos-15
+            llvm_arch: arm64
+            machine: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Check out x360port
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out pinned Xenia fork
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: SomeoneIsWorking/xenia-canary
+          ref: ${{ env.XENIA_REVISION }}
+          path: build/deps/xenia
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev liblz4-dev
+
+      - name: Install pinned LLVM
+        uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0
+        with:
+          version: 20.1.8
+          arch: ${{ matrix.llvm_arch }}
+          env: true
+
+      - name: Install pinned uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: 0.10.12
+          python-version: 3.12.13
+          enable-cache: false
+
+      - name: Verify real Xenia runtime
+        run: >-
+          uv run --frozen python tools/verify.py
+          --xenia-source build/deps/xenia
+          --build-dir build/ci
+          --expected-machine ${{ matrix.machine }}
