@@ -1,4 +1,4 @@
-#include "xenon_host/guest_module.hpp"
+#include "x360port/module_contract.hpp"
 
 #include <array>
 #include <bit>
@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace xenon_host
+namespace x360port
 {
 namespace
 {
@@ -127,27 +127,19 @@ Sha256Digest HashBytes(std::span<const std::byte> bytes) noexcept
     return digest;
 }
 
-Sha256Digest HashFunctionMap(std::span<const FunctionMapping> mappings) noexcept
-{
-    std::vector<std::byte> canonical;
-    canonical.reserve(mappings.size() * sizeof(GuestAddress));
-    for (const FunctionMapping& mapping : mappings)
-    {
-        AppendU32(canonical, mapping.address);
-    }
-    return HashBytes(canonical);
-}
-
 Sha256Digest HashImportManifest(std::span<const ImportRequirement> imports) noexcept
 {
     std::vector<std::byte> canonical;
     for (const ImportRequirement& import : imports)
     {
+        AppendU32(canonical, static_cast<std::uint32_t>(import.kind));
         AppendString(canonical, import.library);
         AppendU32(canonical, import.ordinal);
         AppendString(canonical, import.name);
+        AppendU32(canonical, import.address);
+        AppendU32(canonical, import.record_address);
     }
     return HashBytes(canonical);
 }
 
-} // namespace xenon_host
+} // namespace x360port

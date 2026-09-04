@@ -1,29 +1,15 @@
 # Codemap
 
-This map separates the current prototype locations from their target owners.
-Capability state is in `docs/project-state.md`; transfer order and deletion are
-in `docs/migration.md`.
+| Responsibility | Current owner | Target entry point |
+|---|---|---|
+| Module/import schemas and canonical digests | `include/x360port/module_contract.hpp` | Adapt exact parsed Xenia module metadata without copying title policy. |
+| Fail-closed image/import validation | `include/x360port/validation.hpp`, `src/{module_validation,digest,validation}.cpp` | Run before title activation or guest execution. |
+| Contract falsifiers | `tests/contract_tests.cpp` | Keep synthetic known answers; add production-boundary Xenia cases. |
+| Xenon execution, guest memory, decoding, lowering, host emission, block cache | Xenia (not implemented here yet) | Future bounded context over `Memory`, `Processor`, `ThreadState`, `RawModule`. |
+| Runtime overrides and original calls | absent | Image-aware dispatch through Xenia; scoped original calls suppress only one override. |
+| Title identity, addresses, imports, overrides, policy | consuming title | Never add them here. |
 
-| Responsibility | Current location | Target owner/location | Entry point / disposition |
-|---|---|---|---|
-| Authenticated image identity and layout validation | `include/xenon_host/guest_module.hpp`, `src/module_validation.cpp`, `src/digest.cpp` | `shared/x360port`, around Xenia `RawModule` | Preserve fail-closed identity/layout rules and canonical digests; re-prove on a real Xenia module. |
-| Typed import identity and binding validation | `include/xenon_host/{guest_module,title_adapter}.hpp`, `src/module_validation.cpp`, `src/digest.cpp` | `shared/x360port`, typed import/service boundary | Preserve function-versus-variable callback shape and kind/library/ordinal/name/address/record identity; unknown imports refuse. |
-| Xenon CPU execution | absent here | Xenia x64/A64 dynarecs embedded by `shared/x360port` | Xenia owns decoder, lowering, host emitter, executable memory, and block cache. Never add these here. |
-| Runtime override/original-call dispatch | absent here | `shared/x360port` | Image-aware table; disabled and scoped `super` execute the original guest address through Xenia; mutation invalidates captured call decisions. |
-| Device memory and bounded executor exits | absent here | `shared/x360port` over Xenia runtime objects | Use explicit callbacks/exits; account for Xenia's process-global memory/MMIO/clock assumptions. |
-| Precomputed generated function map | `include/xenon_host/guest_module.hpp`, `src/module_validation.cpp`, `src/digest.cpp` | no target owner | Delete; runtime control-flow discovery and code-cache lookup belong to Xenia. |
-| Generated ABI window | `include/xenon_host/guest_memory.hpp`, `src/guest_memory*.cpp` | no automatic target owner | Do not migrate solely for generated `window_base + address` compatibility. Preserve only independently required Xbox/Xenia mapping facts in x360port. |
-| Static host composition | `include/xenon_host/host.hpp`, `src/host.cpp` | no target owner | Delete after transferable validators land; x360port composes Xenia rather than invoking generated entry code. |
-| Contract falsifiers | `tests/contract_tests.cpp`, `tests/guest_memory_tests.cpp` | corresponding x360port tests | Port only tests for retained image/import invariants, with positive and controlled-negative cases. Generated-map/ABI tests retire. |
-| Mechanical gates | `tools/check_structure.py`, CTest | x360port's normal verifier if still applicable | Do not migrate project-name or source-shape policy blindly. |
-
-## Where does new work go?
-
-- XEX image authentication or import validation needed by Xenia integration →
-  `shared/x360port`.
-- Xenon instruction semantics, x64/A64 emission, executable memory, or block
-  cache → Xenia; contribute to the fork/upstream rather than this repository.
-- Gears addresses, import handlers, native implementations, or policies → the
-  Gears exact title/revision adapter.
-- Generated function inventory, entry thunk, or static ABI compatibility →
-  nowhere; remove it with this repository.
+New CPU semantics and JIT machinery go to the Xenia fork/upstream. New shared
+embedding behavior goes here only when it is proven by a consumer. UE3-specific
+contracts go to `shared/x360ue3`, not this package, once Gears consumes a real
+independently authored boundary.
