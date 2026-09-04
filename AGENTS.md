@@ -1,29 +1,32 @@
-# Working agreement
+# xenon-host retirement guidance
 
-Read `docs/codemap.md` before changing a subsystem and update it in the same change. This repository
-is a shared, title-neutral boundary: it must not depend on Alchemy, Gears, a ROM/XEX, generated
-recompiler output, `ppc_config.h`, or per-title `sub_*` symbols.
+Read `../jit-common/docs/migration.md`, `docs/project-state.md`,
+`docs/migration.md`, and `docs/codemap.md` before changing this repository.
 
-Ownership follows Dusklight's composition pattern without copying its platform implementation:
+`xenon-host` is not the target Xbox 360 framework. The target is
+`shared/xenonport`, a narrow wrapper around Xenia's existing x64/A64 Xenon
+dynarecs. Xenia owns PPC decoding, lowering, host-code emission, executable
+memory, and the translated-block cache. Do not add an interpreter, a new Xenon
+CPU runtime, or `jit-common` cache ownership here.
 
-- `include/xenon_host/guest_module.hpp` owns the generated-module contract.
-- `include/xenon_host/guest_memory.hpp` owns the generated ABI's 4 GiB guest-address window and
-  bounded host translation; `src/guest_memory.cpp` owns image loading and
-  `src/guest_memory_posix.cpp` owns the POSIX reservation implementation.
-- `include/xenon_host/title_adapter.hpp` owns the title/host capability and import-binding contract.
-- `src/module_validation.cpp` owns fail-closed validation.
-- `src/host.cpp` composes validation and invokes the adapter only after acceptance.
+This repository is a migration source only:
 
-Do not add fake-success kernel services, null renderers presented as functional, or permissive
-fallbacks. An absent subsystem is an absent capability and a named `Host::Run` refusal. If input is
-later added, xenon-host owns the host device/SDL boundary and publishes a neutral snapshot; engine
-code consumes that snapshot and must not create a second SDL owner.
+- move its validated authenticated-image and typed import validation contracts
+  into `xenonport`, adapting them to Xenia `Memory`, `Processor`, `ThreadState`,
+  and `RawModule`;
+- do not migrate the address-only generated function map, generated entry ABI,
+  static dispatch, or 4 GiB window solely required by generated code;
+- preserve the current synthetic evidence until equivalent xenonport positive
+  and negative tests exist; and
+- remove this separate repository after the transfer if no independent owner
+  remains. Do not leave a compatibility library, tombstone, or second authority.
 
-The generated Xenon ABI indexes `window_base + full_32_bit_guest_address`; never replace the 4 GiB
-reservation with an exact-size image allocation or derive a pointer before the image base. Physical
-RAM aliases and guest heaps are separate future owners, not implicit behavior of image loading.
+No new consumer may integrate this API. Do not extend its source, tests, or
+tools for the former static product. Documentation changes may clarify the
+transfer and retirement only. Current dirty implementation work must be
+preserved until the operator decides how it contributes to the transfer.
 
-Develop and test with Clang (AppleClang included); other compilers configure with a warning, not a
-ban. Run the full CTest suite, including format, clang-tidy, contract refusal
-coverage, and the 500-line structure gate. Project automation is Python; this library has no
-`run.sh` because it is not a runnable product.
+The first consuming discriminator belongs to Gears, not here: execute real leaf
+`0x8222E868`, call `DbgPrint` through a typed import, and prove disabled,
+enabled, and scoped-`super` override paths through Xenia. Representative
+interactive gameplay is required before Gears deletes its old static path.

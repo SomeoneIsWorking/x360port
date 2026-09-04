@@ -23,5 +23,12 @@ allocation. It was rejected before landing.
 ## Resolution
 
 `GuestMemory` reserves one aligned 4 GiB virtual window, commits and loads the sealed image at its
-guest address, exposes the window base to entry thunks, and checks native translations without
-overflow. Injected host tests refuse reservation, alignment, and commit failures.
+guest address, exposes the window base to generated entry code, and checks native translations
+without overflow. Injected host tests refuse reservation, alignment, and commit failures.
+
+## Migration disposition
+
+This resolved the former generated ABI, whose `window_base + absolute address` contract is not the
+target runtime. Xenonport uses Xenia's memory owner. Preserve only mapping/alias facts that Xenia
+integration independently requires; do not migrate the generated ABI window merely because this
+prototype implemented it.

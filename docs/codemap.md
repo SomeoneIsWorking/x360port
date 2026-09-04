@@ -1,47 +1,29 @@
 # Codemap
 
-This is the title-neutral validation and composition seam between locally generated Xbox 360 guest
-code and a title port. Generated PPC ABI/layout code remains on the title side; platform services
-remain absent until implemented as real shared subsystems. The core gap is execution against a real
-title module: this repository currently proves only the host contract with synthetic data.
+This map separates the current prototype locations from their target owners.
+Capability state is in `docs/project-state.md`; transfer order and deletion are
+in `docs/migration.md`.
 
-Status vocabulary: **verified-synthetic** means built and falsified by synthetic contract tests;
-**absent** means deliberately not implemented and never represented as success.
-
-## Subsystems
-
-| Subsystem | Status | Where | Gap/next |
+| Responsibility | Current location | Target owner/location | Entry point / disposition |
 |---|---|---|---|
-| Guest module API | **verified-synthetic** | `include/xenon_host/guest_module.hpp`, `GuestModule` | Connect a locally generated exact title bridge without adding generated files here. |
-| Title adapter API | **verified-synthetic** | `include/xenon_host/title_adapter.hpp`, `TitleAdapter` | First consumer must supply real capability and import implementations. |
-| Contract validation | **verified-synthetic** | `src/module_validation.cpp`, `ValidateModule` | Re-verify against the first real generated manifest. |
-| Guest memory | **verified-synthetic** | `include/xenon_host/guest_memory.hpp`, `GuestMemory`; `src/guest_memory.cpp`, `GuestMemoryLoader::Load` | Real Linux and sanitizer tests reserve a 32-byte-aligned 4 GiB window, commit/load the exact image pages, and falsify range/reserve/alignment/commit failures. Physical aliases and heaps remain absent. |
-| Host composition | **verified-synthetic** | `src/host.cpp`, `Host::Run` | Owns guest memory through adapter entry; no lifecycle beyond that validated entry exists yet. |
-| SHA-256/canonical manifests | **verified-synthetic** | `src/digest.cpp`, `HashBytes` | Canonical forms cover guest addresses and library/ordinal/name imports. |
-| Mechanical gates | **verified-synthetic** | `tools/check_structure.py`, ctest `structure` | Enforces 500-line ownership and rejects generated/title dependencies in shared product code. |
-| Kernel services | **absent** | capability `KernelServices` | Add only evidenced services with trapping unknown imports. |
-| Graphics | **absent** | capability `Graphics` | No renderer or null renderer exists. |
-| Audio | **absent** | capability `Audio` | No audio backend exists. |
-| Input | **absent** | — | If added, one host device owner publishes neutral snapshots. |
+| Authenticated image identity and layout validation | `include/xenon_host/guest_module.hpp`, `src/module_validation.cpp`, `src/digest.cpp` | `shared/xenonport`, around Xenia `RawModule` | Preserve fail-closed identity/layout rules and canonical digests; re-prove on a real Xenia module. |
+| Typed import identity and binding validation | `include/xenon_host/{guest_module,title_adapter}.hpp`, `src/module_validation.cpp`, `src/digest.cpp` | `shared/xenonport`, typed import/service boundary | Preserve function-versus-variable callback shape and kind/library/ordinal/name/address/record identity; unknown imports refuse. |
+| Xenon CPU execution | absent here | Xenia x64/A64 dynarecs embedded by `shared/xenonport` | Xenia owns decoder, lowering, host emitter, executable memory, and block cache. Never add these here. |
+| Runtime override/original-call dispatch | absent here | `shared/xenonport` | Image-aware table; disabled and scoped `super` execute the original guest address through Xenia; mutation invalidates captured call decisions. |
+| Device memory and bounded executor exits | absent here | `shared/xenonport` over Xenia runtime objects | Use explicit callbacks/exits; account for Xenia's process-global memory/MMIO/clock assumptions. |
+| Precomputed generated function map | `include/xenon_host/guest_module.hpp`, `src/module_validation.cpp`, `src/digest.cpp` | no target owner | Delete; runtime control-flow discovery and code-cache lookup belong to Xenia. |
+| Generated ABI window | `include/xenon_host/guest_memory.hpp`, `src/guest_memory*.cpp` | no automatic target owner | Do not migrate solely for generated `window_base + address` compatibility. Preserve only independently required Xbox/Xenia mapping facts in xenonport. |
+| Static host composition | `include/xenon_host/host.hpp`, `src/host.cpp` | no target owner | Delete after transferable validators land; xenonport composes Xenia rather than invoking generated entry code. |
+| Contract falsifiers | `tests/contract_tests.cpp`, `tests/guest_memory_tests.cpp` | corresponding xenonport tests | Port only tests for retained image/import invariants, with positive and controlled-negative cases. Generated-map/ABI tests retire. |
+| Mechanical gates | `tools/check_structure.py`, CTest | xenonport's normal verifier if still applicable | Do not migrate project-name or source-shape policy blindly. |
 
-## Source tree
+## Where does new work go?
 
-```text
-include/  —  322 lines, 4 files
-└─ xenon_host/  322 lines, 4 files  # public GuestModule, GuestMemory, TitleAdapter, and Host interfaces
-src/      —  783 lines, 7 files     # digest, guest-memory, validation, and composition implementations
-tests/    —  551 lines, 2 files     # contract refusals plus real virtual-memory load/translation tests
-tools/    —  105 lines, 1 file      # mechanical source-structure/dependency gate
-docs/                # project coverage map
-```
-
-## Where is X?
-
-- Exact module acceptance/refusal: `src/module_validation.cpp`, `ValidateModule`
-- Exact import binding coverage: `src/module_validation.cpp`, `ValidateImports`
-- Final pre-entry capability gate: `src/host.cpp`, `Host::Run`
-- 4 GiB ABI window and bounded translation: `include/xenon_host/guest_memory.hpp`, `GuestMemory`
-- Image load: `src/guest_memory.cpp`, `GuestMemoryLoader::Load`
-- POSIX reservation and commit: `src/guest_memory_posix.cpp`, `GuestMemoryLoader::PlatformOperations`
-- Opaque generated-code seam: `include/xenon_host/guest_module.hpp`, `GuestEntryThunk`
-- Contract falsifier: `tests/contract_tests.cpp`
+- XEX image authentication or import validation needed by Xenia integration →
+  `shared/xenonport`.
+- Xenon instruction semantics, x64/A64 emission, executable memory, or block
+  cache → Xenia; contribute to the fork/upstream rather than this repository.
+- Gears addresses, import handlers, native implementations, or policies → the
+  Gears exact title/revision adapter.
+- Generated function inventory, entry thunk, or static ABI compatibility →
+  nowhere; remove it with this repository.
