@@ -9,7 +9,8 @@
 | Library implementation tree | `src/` | Add only cohesive title-neutral x360port owners behind public interfaces. |
 | Contract falsifiers | `tests/contract_tests.cpp` | Keep synthetic known answers; add production-boundary Xenia cases. |
 | Runtime JIT discriminator | `tests/runtime_tests.cpp` | Execute real PPC through the production context and require cache/emission evidence. |
-| Repository build and verification tooling | `tools/{build_support,verify,check_structure}.py` | One locked Python entry point owns host checks, Clang/Ninja configuration, build, lint, and real synthetic runtime tests. |
+| Repository build, dependency preparation, and verification tooling | `tools/{build_support,verify,xenia_dependencies,check_structure}.py` | One locked Python entry point owns host checks, exact Xenia dependency preparation, Clang/Ninja configuration, build, lint, and real synthetic runtime tests. |
+| Tooling policy falsifiers | `tools/tests/` | Exercise the shipping dependency-preparation and nested-CMake policy rather than duplicating it in test helpers. |
 | Xenon execution, guest memory, decoding, lowering, host emission, block cache | pinned Xenia revision | Consumed by `RuntimeContext`; CPU/JIT semantics stay in Xenia. |
 | Runtime overrides and original calls | absent | Image-aware dispatch through Xenia; scoped original calls suppress only one override. |
 | Title identity, addresses, imports, overrides, policy | consuming title | Never add them here. |

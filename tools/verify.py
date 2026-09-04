@@ -8,6 +8,7 @@ import pathlib
 from build_support import (
     DEFAULT_BUILD_DIR,
     ROOT,
+    cmake_child_environment,
     compiler_names,
     python_executable,
     require_build_dir,
@@ -16,6 +17,7 @@ from build_support import (
     require_xenia_source,
     run,
 )
+from xenia_dependencies import prepare_xenia_dependencies
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,6 +33,10 @@ def verify_python() -> None:
     ruff = require_program("ruff")
     run((ruff, "check", "tools"))
     run((ruff, "format", "--check", "tools"))
+    run(
+        (python_executable(), "-m", "unittest", "discover", "-s", "tests"),
+        cwd=ROOT / "tools",
+    )
 
 
 def configure(build_dir: pathlib.Path, xenia_source: pathlib.Path) -> None:
@@ -38,6 +44,7 @@ def configure(build_dir: pathlib.Path, xenia_source: pathlib.Path) -> None:
     c_compiler = require_program(c_name)
     cxx_compiler = require_program(cxx_name)
     require_program("ninja")
+    dependency_options = prepare_xenia_dependencies(xenia_source, build_dir)
     run(
         (
             require_program("cmake"),
@@ -52,7 +59,9 @@ def configure(build_dir: pathlib.Path, xenia_source: pathlib.Path) -> None:
             f"-DCMAKE_CXX_COMPILER={cxx_compiler}",
             f"-DPython3_EXECUTABLE={python_executable()}",
             f"-DX360PORT_XENIA_SOURCE_DIR={xenia_source}",
-        )
+            *dependency_options,
+        ),
+        env=cmake_child_environment(c_compiler, cxx_compiler),
     )
 
 
