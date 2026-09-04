@@ -31,6 +31,7 @@ enum class ValidationError : std::uint8_t
     None,
     InvalidImageDigest,
     ImageSizeMismatch,
+    ImageBaseMisaligned,
     ImageAddressOverflow,
     ImageDigestMismatch,
     InvalidCodeRange,

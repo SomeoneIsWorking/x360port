@@ -9,8 +9,9 @@ depends: src/module_validation.cpp#ValidateModule, src/module_validation.cpp#Val
 
 ## Claim
 
-The validator fails closed on exact image identity/layout and typed import
-identity and callback shape, including function versus variable imports and
+The validator fails closed on exact image identity/layout, including Xenia's
+64 KiB guest-image base alignment, and typed import identity and callback shape,
+including function versus variable imports and
 kind/library/ordinal/name/guest-address/record-address fields.
 
 ## Evidence

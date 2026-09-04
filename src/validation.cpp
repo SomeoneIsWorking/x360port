@@ -11,6 +11,7 @@ std::string_view ToString(ValidationError error) noexcept
         "none",
         "invalid-image-digest",
         "image-size-mismatch",
+        "image-base-misaligned",
         "image-address-overflow",
         "image-digest-mismatch",
         "invalid-code-range",
