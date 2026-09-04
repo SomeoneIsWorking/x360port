@@ -1,22 +1,15 @@
-#include "module_validation.hpp"
+#include "x360port/validation.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <limits>
 
-namespace xenon_host
+namespace x360port
 {
 namespace
 {
 
-constexpr std::uint32_t AllCapabilityBits = static_cast<std::uint32_t>(Capability::GuestMemory) |
-                                            static_cast<std::uint32_t>(Capability::KernelServices) |
-                                            static_cast<std::uint32_t>(Capability::Graphics) |
-                                            static_cast<std::uint32_t>(Capability::Audio) |
-                                            static_cast<std::uint32_t>(Capability::Storage) |
-                                            static_cast<std::uint32_t>(Capability::Networking);
-
-[[nodiscard]] RunResult Refuse(RunError error, std::string detail)
+[[nodiscard]] ValidationResult Refuse(ValidationError error, std::string detail)
 {
     return {.error = error, .detail = std::move(detail)};
 }
@@ -68,125 +61,95 @@ constexpr std::uint32_t AllCapabilityBits = static_cast<std::uint32_t>(Capabilit
 
 } // namespace
 
-bool IsPortableKey(std::string_view key) noexcept
-{
-    if (key.empty() || key == "." || key == ".." || key.front() == '.' || key.back() == '.')
-    {
-        return false;
-    }
-    return std::ranges::all_of(key, IsPortableKeyCharacter);
-}
-
-bool IsValidCapabilitySet(CapabilitySet capabilities) noexcept
-{
-    return (capabilities.Bits() & ~AllCapabilityBits) == 0;
-}
-
-RunResult ValidateModule(const GuestModule& module, const GuestMemory& memory) noexcept
+ValidationResult ValidateModule(const GuestModule& module) noexcept
 {
     const ModuleDescriptor& descriptor = module.Descriptor();
-    if (descriptor.image.sha256 != memory.Identity().sha256 ||
-        descriptor.image.base != memory.Identity().base ||
-        descriptor.image.size != memory.Identity().size)
+    if (std::ranges::all_of(descriptor.image.sha256, [](std::uint8_t byte) { return byte == 0; }))
     {
-        return Refuse(RunError::ImageDigestMismatch,
-                      "module image identity changed after guest memory was loaded");
+        return Refuse(ValidationError::InvalidImageDigest,
+                      "module image identity has an empty SHA-256 digest");
+    }
+    const std::span<const std::byte> image = module.ImageBytes();
+    if (image.size() != descriptor.image.size)
+    {
+        return Refuse(ValidationError::ImageSizeMismatch,
+                      "module image byte count does not match its sealed size");
     }
     const std::uint64_t image_end =
         static_cast<std::uint64_t>(descriptor.image.base) + descriptor.image.size;
+    if (image_end > std::numeric_limits<std::uint32_t>::max() + std::uint64_t{1})
+    {
+        return Refuse(ValidationError::ImageAddressOverflow,
+                      "module image exceeds the Xbox 360 32-bit address space");
+    }
+    if (HashBytes(image) != descriptor.image.sha256)
+    {
+        return Refuse(ValidationError::ImageDigestMismatch,
+                      "module image bytes do not match the sealed SHA-256 digest");
+    }
 
     const CodeRange code = descriptor.code;
     const std::uint64_t code_end = static_cast<std::uint64_t>(code.base) + code.size;
     if (code.size == 0 || (code.base & 3U) != 0 || (code.size & 3U) != 0 ||
         code.base < descriptor.image.base || code_end > image_end)
     {
-        return Refuse(RunError::InvalidCodeRange,
+        return Refuse(ValidationError::InvalidCodeRange,
                       "code range must be aligned, non-empty, and contained by the image");
     }
     if ((descriptor.image.entry_point & 3U) != 0 || !IsInside(descriptor.image.entry_point, code))
     {
-        return Refuse(RunError::EntryPointOutsideCode,
+        return Refuse(ValidationError::EntryPointOutsideCode,
                       "image entry point is not an aligned address in the code range");
-    }
-
-    const std::span<const FunctionMapping> functions = module.FunctionMap();
-    if (functions.size() != descriptor.function_count)
-    {
-        return Refuse(RunError::FunctionCountMismatch,
-                      "function-map count does not match the sealed count");
-    }
-    if (functions.empty())
-    {
-        return Refuse(RunError::EmptyFunctionMap, "function map is empty");
-    }
-    bool found_entry = false;
-    for (std::size_t index = 0; index < functions.size(); ++index)
-    {
-        const FunctionMapping& function = functions[index];
-        if ((function.address & 3U) != 0 || !IsInside(function.address, code))
-        {
-            return Refuse(RunError::InvalidFunctionAddress,
-                          "function-map address is unaligned or outside code");
-        }
-        if (function.thunk == nullptr)
-        {
-            return Refuse(RunError::NullFunctionThunk, "function-map thunk is null");
-        }
-        if (index != 0 && functions[index - 1U].address >= function.address)
-        {
-            return Refuse(RunError::UnsortedFunctionMap,
-                          "function map must be strictly sorted by guest address");
-        }
-        found_entry = found_entry || function.address == descriptor.image.entry_point;
-    }
-    if (!found_entry)
-    {
-        return Refuse(RunError::EntryPointMissing, "function map does not contain the image entry");
-    }
-    if (HashFunctionMap(functions) != descriptor.function_map_sha256)
-    {
-        return Refuse(RunError::FunctionMapDigestMismatch,
-                      "function-map addresses do not match the sealed SHA-256");
     }
 
     const std::span<const ImportRequirement> imports = module.ImportManifest();
     if (imports.size() != descriptor.import_count)
     {
-        return Refuse(RunError::ImportCountMismatch,
+        return Refuse(ValidationError::ImportCountMismatch,
                       "import-manifest count does not match the sealed count");
     }
     for (std::size_t index = 0; index < imports.size(); ++index)
     {
         const ImportRequirement& import = imports[index];
+        const bool record_inside_image =
+            import.record_address >= descriptor.image.base &&
+            static_cast<std::uint64_t>(import.record_address) + sizeof(std::uint32_t) <= image_end;
+        const bool function_address =
+            import.kind == ImportKind::Function && IsInside(import.address, code);
+        const bool variable_address =
+            import.kind == ImportKind::Variable && import.address == import.record_address &&
+            import.address >= descriptor.image.base && import.address < image_end;
         if (import.library.size() > std::numeric_limits<std::uint32_t>::max() ||
             import.name.size() > std::numeric_limits<std::uint32_t>::max() ||
             !IsValidLibrary(import.library) || import.ordinal == 0 ||
-            !IsValidImportName(import.name))
+            !IsValidImportName(import.name) || (import.address & 3U) != 0 ||
+            (import.record_address & 3U) != 0 || !record_inside_image ||
+            (!function_address && !variable_address))
         {
-            return Refuse(RunError::InvalidImport,
-                          "import contains an invalid library, ordinal, or name");
+            return Refuse(ValidationError::InvalidImport,
+                          "import contains invalid identity, kind, or guest addresses");
         }
         if (index != 0 && !ImportLess(imports[index - 1U], import))
         {
-            return Refuse(RunError::UnsortedImportManifest,
+            return Refuse(ValidationError::UnsortedImportManifest,
                           "import manifest must be strictly sorted by library and ordinal");
         }
     }
     if (HashImportManifest(imports) != descriptor.import_manifest_sha256)
     {
-        return Refuse(RunError::ImportManifestDigestMismatch,
+        return Refuse(ValidationError::ImportManifestDigestMismatch,
                       "import manifest does not match the sealed SHA-256");
     }
     return {};
 }
 
-RunResult ValidateImports(const GuestModule& module,
-                          std::span<const ImportBinding> bindings) noexcept
+ValidationResult ValidateImports(const GuestModule& module,
+                                 std::span<const ImportBinding> bindings) noexcept
 {
     const std::span<const ImportRequirement> required = module.ImportManifest();
     if (bindings.size() != required.size())
     {
-        return Refuse(RunError::ImportBindingCountMismatch,
+        return Refuse(ValidationError::ImportBindingCountMismatch,
                       "adapter binding count does not exactly cover the import manifest");
     }
     for (std::size_t index = 0; index < required.size(); ++index)
@@ -194,16 +157,27 @@ RunResult ValidateImports(const GuestModule& module,
         if (bindings[index].library != required[index].library ||
             bindings[index].ordinal != required[index].ordinal)
         {
-            return Refuse(RunError::ImportBindingMismatch,
+            return Refuse(ValidationError::ImportBindingMismatch,
                           "adapter import binding does not match the manifest at the same index");
         }
-        if (bindings[index].handler == nullptr)
+        if (bindings[index].kind != required[index].kind)
         {
-            return Refuse(RunError::NullImportHandler,
-                          "adapter declared an import without an implementation");
+            return Refuse(ValidationError::ImportBindingKindMismatch,
+                          "adapter import binding kind does not match the manifest");
+        }
+        const bool valid_function = bindings[index].kind == ImportKind::Function &&
+                                    bindings[index].function_handler != nullptr &&
+                                    bindings[index].variable_resolver == nullptr;
+        const bool valid_variable = bindings[index].kind == ImportKind::Variable &&
+                                    bindings[index].function_handler == nullptr &&
+                                    bindings[index].variable_resolver != nullptr;
+        if (!valid_function && !valid_variable)
+        {
+            return Refuse(ValidationError::ImportBindingCallbackMismatch,
+                          "adapter import binding has the wrong callback shape");
         }
     }
     return {};
 }
 
-} // namespace xenon_host
+} // namespace x360port

@@ -1,56 +1,32 @@
 # Project goals
 
-## G001 — Transfer reusable Xbox 360 validation contracts to x360port
-
-### Why
-
-Authenticated runtime images and typed imports remain necessary when Gears and
-other titles execute through Xenia. They belong beside the runtime that consumes
-them, not in a static-host library.
+## G001 — Embed Xenia as the shared Xbox 360 executor
 
 ### Success conditions
 
-- `shared/x360port` validates exact image identity/layout through Xenia
-  `RawModule` before title policy or guest entry.
-- It validates canonical typed function and variable imports, including
-  kind/library/ordinal/name/guest-address/record-address identity and callback
-  shape, with positive and controlled-negative tests.
-- The transferred contracts have one owner and no consumer depends on
-  `xenon-host`.
+- A bounded context owns Xenia `Memory`, `Processor`, `ThreadState`, and
+  `RawModule`, with explicit single-instance or proven isolated-instance rules.
+- Non-native guest code executes only through Xenia's x64/A64 dynarecs and
+  reports nonzero translated-block work; no gameplay interpreter is linked or
+  selectable.
+- Authenticated module loading, typed imports, device-memory callbacks,
+  image-aware overrides, scoped original calls, bounded exits, and executable
+  invalidation are exercised at the production boundary.
 
 ### Constraints
 
-- Xenia retains ownership of Xenon execution, guest memory, host-code emission,
-  executable memory, and its block cache.
-- Do not transfer the generated function map, generated entry ABI, static
-  dispatcher, or ABI-only 4 GiB window.
+- Xenia retains decoder, lowering, host emitter, executable-memory, guest-memory,
+  and block-cache ownership.
+- No generated source, function maps, static entry ABI, compatibility host, or
+  title-specific policy.
 
-### Non-goals
-
-- Turning `xenon-host` into a dynarec, preserving it as a compatibility layer,
-  or defining title-specific policy here.
-
-## G002 — Remove xenon-host after its last responsibility moves
-
-### Why
-
-A second shared boundary with overlapping image/import contracts would recreate
-the ownership split the migration is intended to eliminate.
+## G002 — Provide reusable fail-closed module and import contracts
 
 ### Success conditions
 
-- Equivalent x360port tests re-prove every transferred invariant and its
-  negative discriminator.
-- Generated-only contracts and tests are explicitly retired rather than copied.
-- If no independent owner remains, the separate repository and all consumer
-  references are removed; no legacy/tombstone package survives.
-
-### Constraints
-
-- Preserve current code and dirty work until the transfer is reviewed.
-- Repository deletion follows consumer migration and equivalent evidence; it is
-  not performed merely because the new architecture is documented.
-
-### Non-goals
-
-- Shipping or maintaining two public APIs for the same validation boundary.
+- Exact image digest, size, address range, code range, and entry point are
+  validated before title policy or execution.
+- Typed function/variable imports seal kind, library, ordinal, name, guest
+  address, record address, and exclusive callback shape.
+- Positive and controlled-negative tests cover every named refusal and every
+  canonical digest field, first synthetically and then through Xenia `RawModule`.

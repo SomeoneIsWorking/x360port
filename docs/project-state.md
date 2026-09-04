@@ -2,60 +2,27 @@
 
 ## Comparison baseline
 
-The baseline is the current standalone `xenon-host` prototype for statically
-generated Xbox 360 guest code. The target workflow embeds Xenia through
-`shared/x360port`, retains the useful image/import validation contracts there,
-and removes this separate repository when it has no independent owner.
+The baseline is direct per-title Xenia integration or the retired generated-code
+host approach. The target is one reusable Xenia-backed runtime boundary with no
+static or interpreter product path.
 
 | ID | Capability | State | Dependencies | Goals |
 |---|---|---|---|---|
-| S001 | Authenticated image identity/layout contract is synthetically falsified | verified | — | G001 |
-| S002 | Typed import manifest and callback-shape contract is synthetically falsified | verified | — | G001 |
-| S003 | Image/import contracts are integrated and re-proven in x360port | missing | S001, S002 | G001, G002 |
-| S004 | Generated function-map and static ABI contracts are retired | missing | S003 | G001, G002 |
-| S005 | Separate xenon-host repository and consumer references are removed | missing | S003, S004 | G002 |
+| S001 | Authenticated image/layout validator is synthetically falsified | verified | — | G002 |
+| S002 | Typed import manifest/binding validator is synthetically falsified | verified | — | G002 |
+| S003 | Xenia runtime objects have one bounded embedding context | missing | — | G001 |
+| S004 | Retained validators execute against Xenia `RawModule` | missing | S001, S002, S003 | G001, G002 |
+| S005 | Gears leaf/import/override discriminator executes through Xenia | missing | S003, S004 | G001 |
 
 ## Current focus
 
-S003 is the current focus. Preserve the current dirty code and evidence while
-moving only the independently reusable authenticated-image and typed-import
-contracts to x360port. Do not add new consumers or extend the static host.
+S003 is the current focus. `x360port_validation` is the only implemented
+library. There is deliberately no `x360port` executor target, so consumers
+cannot mistake synthetic contract preservation for a runnable product.
 
-## Capability details
+## Evidence
 
-### S001 — Authenticated image contract
-
-Evidence: claim C001 and the contract tests exercise exact image size, base,
-entry point, code range, SHA-256, and named refusal paths. The evidence is
-synthetic and has not yet been repeated against Xenia `RawModule`.
-
-### S002 — Typed import contract
-
-Evidence: claim C001 and instrument I001 cover canonical function/variable
-import fields, distinct handler/resolver callback shapes, one accepted bundle,
-and negative mutations. These facts transfer; the generated function-map digest
-does not.
-
-### S003 — x360port integration
-
-Missing capability: `shared/x360port` does not yet exist, so neither contract
-has a runtime Xenia owner or real-module evidence.
-
-Gap: Integrate with Xenia `Memory`, `Processor`, `ThreadState`, and `RawModule`,
-then run equivalent positive and negative tests at that production boundary.
-
-### S004 — Generated-contract retirement
-
-Missing capability: The current API and tests still model a precomputed
-function map, generated entry code, and a 4 GiB window required by that ABI.
-
-Gap: Do not copy those contracts. Remove them when S003 preserves the reusable
-subcontracts and all consumers have moved.
-
-### S005 — Repository removal
-
-Missing capability: This repository and its references still exist.
-
-Gap: After S003 and S004, audit for any independent responsibility. If none
-remains, remove the repository and references rather than leaving a deprecated
-package or tombstone.
+`x360port_contract_tests` carries independent SHA-256 and canonical-import
+known answers, mutations of every canonical import field, accepted function and
+variable bindings, every named validation refusal, and wrong callback-shape
+controls. This does not prove Xenia integration or guest execution.
