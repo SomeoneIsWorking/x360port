@@ -13,6 +13,8 @@ namespace x360port
 using GuestAddress = std::uint32_t;
 using Sha256Digest = std::array<std::uint8_t, 32>;
 
+inline constexpr std::uint32_t kGuestImageBaseAlignment = 64U * 1024U;
+
 struct ImageIdentity
 {
     Sha256Digest sha256{};

@@ -82,6 +82,11 @@ ValidationResult ValidateModule(const GuestModule& module)
         return Refuse(ValidationError::ImageAddressOverflow,
                       "module image exceeds the Xbox 360 32-bit address space");
     }
+    if ((descriptor.image.base & (kGuestImageBaseAlignment - 1U)) != 0)
+    {
+        return Refuse(ValidationError::ImageBaseMisaligned,
+                      "module image base is not aligned to Xenia's 64 KiB guest-image page");
+    }
     if (HashBytes(image) != descriptor.image.sha256)
     {
         return Refuse(ValidationError::ImageDigestMismatch,

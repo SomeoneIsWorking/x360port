@@ -191,6 +191,8 @@ void TestModuleRefusals()
                   [](Fixture& value) { value.module.descriptor.image.sha256 = {}; });
     ModuleRefusal("image size mismatch", ValidationError::ImageSizeMismatch,
                   [](Fixture& value) { --value.module.descriptor.image.size; });
+    ModuleRefusal("unaligned image base", ValidationError::ImageBaseMisaligned,
+                  [](Fixture& value) { value.module.descriptor.image.base += 4U; });
     ModuleRefusal("image address overflow", ValidationError::ImageAddressOverflow,
                   [](Fixture& value) { value.module.descriptor.image.base = 0xfffffff0U; });
     ModuleRefusal("image digest mismatch", ValidationError::ImageDigestMismatch,

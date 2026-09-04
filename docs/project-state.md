@@ -35,7 +35,8 @@ device-backed guest-memory callback boundary.
 ### S001 — image validation
 
 Evidence: `x360port_contract_tests` carries independent SHA-256 known answers
-and mutations of every authenticated image/layout field.
+and mutations of every authenticated image/layout field, including a malformed
+image base that must receive a typed refusal before Xenia fixed allocation.
 
 ### S002 — import validation
 
