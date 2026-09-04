@@ -14,6 +14,8 @@ FORBIDDEN_PRODUCT_PATTERNS = {
     "generated PPC configuration": re.compile(r"ppc_(?:config|runtime)\.h"),
     "per-title generated function": re.compile(r"\bsub_[0-9A-Fa-f]+\b"),
     "title/engine dependency": re.compile(r"\b(?:alchemy|gears)\b", re.IGNORECASE),
+    "direct standard-error logging": re.compile(r"(?:fprintf\s*\(\s*stderr|std::(?:cerr|clog))"),
+    "process-environment configuration": re.compile(r"(?:std::)?getenv\s*\("),
 }
 
 
@@ -66,8 +68,16 @@ def run_selftest() -> int:
         include = root / "include"
         include.mkdir()
         (include / "leak.hpp").write_text('#include "ppc_config.h"\n', encoding="utf-8")
+        (source / "policy_leaks.cpp").write_text(
+            'fprintf(stderr, "bad");\nauto value = getenv("X360PORT_MODE");\n',
+            encoding="utf-8",
+        )
         dependencies = dependency_violations(root)
-        expected_dependency = [(pathlib.Path("include/leak.hpp"), 1, "generated PPC configuration")]
+        expected_dependency = [
+            (pathlib.Path("include/leak.hpp"), 1, "generated PPC configuration"),
+            (pathlib.Path("src/policy_leaks.cpp"), 1, "direct standard-error logging"),
+            (pathlib.Path("src/policy_leaks.cpp"), 2, "process-environment configuration"),
+        ]
         if dependencies != expected_dependency:
             print(
                 "structure self-test: expected dependency refusal "

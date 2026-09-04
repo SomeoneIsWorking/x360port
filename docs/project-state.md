@@ -10,17 +10,24 @@ static or interpreter product path.
 |---|---|---|---|---|
 | S001 | Authenticated image/layout validator is synthetically falsified | verified | — | G002 |
 | S002 | Typed import manifest/binding validator is synthetically falsified | verified | — | G002 |
-| S003 | Xenia runtime objects have one bounded embedding context | missing | — | G001 |
-| S004 | Retained validators execute against Xenia `RawModule` | missing | S001, S002, S003 | G001, G002 |
+| S003 | Xenia runtime objects have one bounded embedding context | verified | — | G001 |
+| S004 | Retained validators execute against Xenia `RawModule` | verified | S001, S002, S003 | G001, G002 |
 | S005 | Gears leaf/import/override discriminator executes through Xenia | missing | S003, S004 | G001 |
 | S006 | Xenia A64 execution is qualified on Apple Silicon macOS | missing | S003, S004 | G001 |
 | S007 | Xenia A64 execution is qualified on Android arm64-v8a | missing | S003, S004 | G001 |
+| S008 | Typed function and variable imports execute through Xenia exports | missing | S002, S003, S004 | G001, G002 |
+| S009 | Device-memory callbacks have a title-neutral runtime boundary | missing | S003, S004 | G001 |
+| S010 | Image-aware overrides and scoped original calls use Xenia dispatch | missing | S003, S004, S008 | G001 |
+| S011 | Guest calls have bounded exit and refusal contracts | partial | S003, S004 | G001 |
+| S012 | Executable writes invalidate Xenia translations coherently | missing | S003, S004 | G001 |
+| S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
 
 ## Current focus
 
-S003 is the current focus. `x360port_validation` is the only implemented
-library. There is deliberately no `x360port` executor target, so consumers
-cannot mistake synthetic contract preservation for a runnable product.
+S008 is the current focus. The real `x360port` target executes authenticated,
+import-free PPC through Xenia's x64 dynarec. Non-empty validated import sets are
+refused rather than silently ignored; attaching them to Xenia exports is the
+next shared runtime boundary.
 
 ## Capability details
 
@@ -37,13 +44,17 @@ callback-shape controls.
 
 ### S003 — Xenia context
 
-Missing capability: no owner yet composes Xenia `Memory`, `Processor`,
-`ThreadState`, and `RawModule` with explicit instance lifetime.
+Evidence: `RuntimeContext` owns Xenia `Memory`, `Processor`, `ThreadState`, and
+the registered `RawModule`, enforces the process-global fixed mapping as one
+active instance, and releases stack/image mappings after their Xenia owners.
+The teardown/recreation test reloads and executes from the same guest range.
 
 ### S004 — Xenia-backed validation
 
-Missing capability: apply the verified synthetic validators to a real Xenia
-`RawModule` in the future execution context.
+Evidence: `RuntimeContext::LoadModule` runs the retained module/import validators
+before `AllocFixed` and `RawModule::SetAddressRange`. A valid synthetic image is
+then registered as the production Xenia `RawModule`; invalid identity and
+non-empty runtime imports fail before guest memory is committed.
 
 ### S005 — Gears discriminator
 
@@ -62,3 +73,38 @@ Missing capability: qualify Xenia's A64 dynarec in the Android arm64-v8a
 product package, including executable-memory protection, instruction-cache
 coherence, host ABI, signal behavior, sustained execution, and representative
 gameplay.
+
+### S008 — typed runtime imports
+
+Missing capability: attach exact validated function and variable bindings to
+Xenia's export machinery. The runtime currently returns
+`RuntimeImportsNotImplemented` for every non-empty binding set.
+
+### S009 — device-memory callbacks
+
+Missing capability: define and execute a narrow title-neutral callback contract
+for device-backed guest ranges without importing title or engine policy.
+
+### S010 — overrides and original calls
+
+Missing capability: dispatch image-authenticated overrides through Xenia and
+scope an original call so it suppresses exactly one matching override.
+
+### S011 — bounded calls
+
+Evidence: entry addresses are constrained to authenticated code, the call ABI
+accepts at most eight register arguments, and LR/SP are restored through an
+exception-safe call frame. Missing capability: a runtime-owned execution budget
+or cancellation/exit contract for guest code that does not return.
+
+### S012 — executable invalidation
+
+Missing capability: prove executable guest writes invalidate affected Xenia
+translations and leave unrelated cached functions intact.
+
+### S013 — x64 JIT execution
+
+Evidence: `x360port_runtime_tests` loads big-endian PPC `li r3, 42; blr`, requires
+Xenia to emit a non-empty host function, executes it twice, observes return 42,
+and proves the second call does not increment the translation count. The same
+test tears down and recreates the runtime before reloading the identical range.
