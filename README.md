@@ -1,44 +1,49 @@
 # xenon-host
 
-`xenon-host` is a title-neutral contract boundary for statically recompiled Xbox 360 games. It is
-not an emulator, a kernel, or a renderer. A title bridge supplies one exact guest image, its opaque
-entry thunks, its import requirements, and the host capabilities it genuinely implements.
+`xenon-host` is a temporary migration source, not the Xbox 360 product
+framework. The target framework is `shared/xenonport`, which wraps Xenia's
+existing x64/A64 Xenon dynarecs and runtime objects. No new title should consume
+this library.
 
-The host validates the whole bundle before guest entry:
+## What transfers
 
-- exact image byte count, 32-bit layout, entry point, and SHA-256;
-- a 32-byte-aligned 4 GiB virtual guest window, with only the sealed image range initially committed
-  and loaded at its full 32-bit guest address;
-- exact aligned code range and strictly sorted address-to-thunk map, including its count and digest;
-- exact sorted library/ordinal import manifest, including its count and digest;
-- exact one-for-one non-null host bindings for that manifest; and
-- explicit adapter capabilities required by the caller.
+The repository has synthetic positive and negative evidence for two reusable
+contract families:
 
-Any mismatch is a named refusal. There are no successful kernel placeholders, renderer stubs, or
-title-specific generated symbols in this repository.
+- authenticated image identity and layout validation; and
+- canonical typed import manifests, including function handlers and variable
+  resolvers with kind/library/ordinal/name/guest-address/record-address identity.
 
-## Build and verify
+These facts move into xenonport and are re-proven against its Xenia-backed
+runtime boundary. Manifest canonicalization uses big-endian 32-bit integers and
+length-prefixed library/name bytes.
 
-```sh
-CXX=clang++ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j
-ctest --test-dir build --output-on-failure
-```
+## What retires
 
-Clang, `clang-format`, and `clang-tidy` are required. The library has no runtime dependency on
-Alchemy, Gears, SDL, XenonRecomp, or proprietary/generated game code.
+The following belong only to the abandoned static/generated design and must not
+be copied into xenonport:
 
-## Title integration
+- the precomputed address-only function map and its digest;
+- generated entry thunks or a concrete generated PPC ABI;
+- a standalone static host dispatcher; and
+- the 4 GiB reservation when its only purpose is `window_base + absolute guest
+  address` compatibility with generated code.
 
-Implement `xenon_host::GuestModule` in a generated or ignored title bridge and implement
-`xenon_host::TitleAdapter` in the title port. Keep the concrete PPC ABI on the title side: the
-shared interface sees only `GuestEntryThunk(void*)`. A future XenonRecomp split should expose
-portable ABI types from `ppc_abi.h` while retaining layout and lookup data in generated
-`ppc_runtime.h`; neither header belongs here.
+Xenia owns CPU state, guest address spaces, decoding, lowering, x64/A64 host
+emission, executable memory, and translated-block caching. Xenonport owns the
+narrow embedding boundary around Xenia `Memory`, `Processor`, `ThreadState`,
+and `RawModule`: authenticated images, typed imports, device-memory callbacks,
+image-aware runtime overrides, scoped original calls, bounded exits,
+invalidation, and explicit handling of Xenia's process-global assumptions.
 
-The title adapter must bind every import and advertise only real capabilities. `RunRequest` always
-requires guest memory by default; add every other capability needed for a run. `Host::Run` refuses
-before guest entry if any are absent. `ValidatedGuestModule::Memory()` exposes the live
-`GuestMemory`; generated entry thunks receive `GuestMemory::WindowBase()`, while native services use
-the overflow-checked `Translate(GuestMemoryRange)` seam. Physical-memory aliases and guest heaps are
-not implemented yet and must not be inferred from the image mapping.
+## Retirement condition
+
+Preserve this repository and its current dirty implementation work until the
+transfer is reviewed and equivalent xenonport discriminators cover both answers
+for each retained contract. Then remove the separate repository if no
+independent responsibility remains. Do not keep it as a compatibility layer,
+legacy package, or second source of truth.
+
+The portfolio plan is `../jit-common/docs/migration.md`; local transfer details
+are in `docs/migration.md`, factual coverage in `docs/project-state.md`, and
+ownership in `docs/codemap.md`.

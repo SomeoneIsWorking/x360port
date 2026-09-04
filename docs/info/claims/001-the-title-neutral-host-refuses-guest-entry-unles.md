@@ -9,12 +9,12 @@ depends: src/host.cpp#Host::Run, src/module_validation.cpp#ValidateModule, tests
 
 ## Claim
 
-The title-neutral host refuses guest entry unless exact image identity/layout, sorted sealed function and import manifests, exact non-null import bindings, portable title keys, and required capabilities all validate.
+The current prototype's reusable subcontracts fail closed on exact image identity/layout and on typed import identity and callback shape, including function versus variable imports and kind/library/ordinal/name/guest-address/record-address fields. Its generated function-map check is implementation evidence only and is not a xenonport requirement.
 
 ## Evidence
 
-xenon_host_contract_tests: 27 checks passed, comprising independent SHA-256 KAT, one acceptance, and every 25 named refusal paths
+xenon_host_contract_tests: 44 checks passed, comprising independent SHA-256 and canonical-import known answers, six import-digest field discriminators, one acceptance covering both binding kinds, every 28 named RunError refusal category, and additional address/callback-shape discriminators. This is synthetic xenon-host evidence; xenonport must re-prove the retained image/import subset through Xenia.
 
 ## What would falsify it
 
-A RunError, Host::Run gate, module/import validation rule, canonical digest, or contract fixture changes without rerunning contract, format, clang-tidy, and structure gates
+An image/import validation rule, canonical digest, callback shape, or cited fixture changes without re-running the relevant tests, or xenonport cannot reproduce a retained positive/negative case. The precomputed function map may be deleted without falsifying the narrowed claim.
