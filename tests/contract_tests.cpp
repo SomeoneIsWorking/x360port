@@ -14,7 +14,7 @@ namespace
 
 using namespace x360port;
 
-void ImportThunk(void*) noexcept {}
+void ImportThunk(void*, void*, void*) noexcept {}
 [[nodiscard]] GuestAddress ResolveVariable(void*) noexcept { return 0x8200001cU; }
 
 class SyntheticModule final : public GuestModule
@@ -35,7 +35,7 @@ class SyntheticModule final : public GuestModule
             .size = static_cast<std::uint32_t>(image.size()),
             .entry_point = 0x82000004U,
         };
-        descriptor.code = {.base = 0x82000004U, .size = 16U};
+        descriptor.code = {.base = 0x82000004U, .size = 20U};
         ResealImports();
     }
 
@@ -63,8 +63,14 @@ struct Fixture
 {
     SyntheticModule module;
     std::vector<ImportBinding> bindings{
-        {"xam", 1U, ImportKind::Function, ImportThunk, nullptr},
-        {"xboxkrnl", 2U, ImportKind::Variable, nullptr, ResolveVariable},
+        {.library = "xam",
+         .ordinal = 1U,
+         .kind = ImportKind::Function,
+         .function_handler = ImportThunk},
+        {.library = "xboxkrnl",
+         .ordinal = 2U,
+         .kind = ImportKind::Variable,
+         .variable_resolver = ResolveVariable},
     };
 };
 
@@ -202,6 +208,25 @@ void TestModuleRefusals()
                       value.module.imports[0].library = "";
                       value.module.ResealImports();
                   });
+    ModuleRefusal("import ordinal out of range", ValidationError::ImportOrdinalOutOfRange,
+                  [](Fixture& value)
+                  {
+                      value.module.imports[0].ordinal = 0x10000U;
+                      value.module.ResealImports();
+                  });
+    ModuleRefusal("conflicting import address", ValidationError::ImportAddressConflict,
+                  [](Fixture& value)
+                  {
+                      value.module.imports[1].address = value.module.imports[0].address;
+                      value.module.ResealImports();
+                  });
+    ModuleRefusal("conflicting import record", ValidationError::ImportAddressConflict,
+                  [](Fixture& value)
+                  {
+                      value.module.imports[1].record_address =
+                          value.module.imports[0].record_address;
+                      value.module.ResealImports();
+                  });
     ModuleRefusal("invalid import kind", ValidationError::InvalidImport,
                   [](Fixture& value)
                   {
@@ -250,10 +275,14 @@ void TestBindingRefusals()
                    [](Fixture& value) { value.bindings[0].function_handler = nullptr; });
     BindingRefusal("function has resolver", ValidationError::ImportBindingCallbackMismatch,
                    [](Fixture& value) { value.bindings[0].variable_resolver = ResolveVariable; });
+    BindingRefusal("function has variable context", ValidationError::ImportBindingCallbackMismatch,
+                   [](Fixture& value) { value.bindings[0].variable_resolution_context = &value; });
     BindingRefusal("null variable resolver", ValidationError::ImportBindingCallbackMismatch,
                    [](Fixture& value) { value.bindings[1].variable_resolver = nullptr; });
     BindingRefusal("variable has handler", ValidationError::ImportBindingCallbackMismatch,
                    [](Fixture& value) { value.bindings[1].function_handler = ImportThunk; });
+    BindingRefusal("variable has function context", ValidationError::ImportBindingCallbackMismatch,
+                   [](Fixture& value) { value.bindings[1].function_context = &value; });
 }
 
 void TestErrorCoverage()

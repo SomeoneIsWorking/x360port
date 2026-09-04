@@ -5,10 +5,11 @@
 | Module/import schemas and canonical digests | `include/x360port/module_contract.hpp` | Adapt exact parsed Xenia module metadata without copying title policy. |
 | Fail-closed image/import validation | `include/x360port/validation.hpp`, `src/{module_validation,digest,validation}.cpp` | Run before title activation or guest execution. |
 | Xenia context and guest call ownership | `include/x360port/runtime.hpp`, `src/runtime.cpp` | Extend through narrow typed runtime contracts; keep Xenia types behind the Pimpl boundary. |
+| Xenia export/import attachment and callback lifetime | `src/runtime_imports.{hpp,cpp}` | Keep manifest-owned names/tables alive through resolver teardown; bind only validated title-neutral imports. |
 | Library implementation tree | `src/` | Add only cohesive title-neutral x360port owners behind public interfaces. |
 | Contract falsifiers | `tests/contract_tests.cpp` | Keep synthetic known answers; add production-boundary Xenia cases. |
 | Runtime JIT discriminator | `tests/runtime_tests.cpp` | Execute real PPC through the production context and require cache/emission evidence. |
-| Repository verification tooling | `tools/` | Python-only focused structure and boundary checks. |
+| Repository build and verification tooling | `tools/{build_support,verify,check_structure}.py` | One locked Python entry point owns host checks, Clang/Ninja configuration, build, lint, and real synthetic runtime tests. |
 | Xenon execution, guest memory, decoding, lowering, host emission, block cache | pinned Xenia revision | Consumed by `RuntimeContext`; CPU/JIT semantics stay in Xenia. |
 | Runtime overrides and original calls | absent | Image-aware dispatch through Xenia; scoped original calls suppress only one override. |
 | Title identity, addresses, imports, overrides, policy | consuming title | Never add them here. |

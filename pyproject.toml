@@ -1,0 +1,19 @@
+[project]
+name = "x360port-tooling"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "cmake==4.1.0",
+    "ninja==1.13.0",
+    "ruff==0.16.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["B", "E4", "E7", "E9", "F", "I", "PERF", "RUF", "S", "UP"]
+ignore = [
+    "COM812",
+]

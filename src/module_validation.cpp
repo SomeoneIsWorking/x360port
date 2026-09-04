@@ -61,7 +61,7 @@ namespace
 
 } // namespace
 
-ValidationResult ValidateModule(const GuestModule& module) noexcept
+ValidationResult ValidateModule(const GuestModule& module)
 {
     const ModuleDescriptor& descriptor = module.Descriptor();
     if (std::ranges::all_of(descriptor.image.sha256, [](std::uint8_t byte) { return byte == 0; }))
@@ -111,11 +111,26 @@ ValidationResult ValidateModule(const GuestModule& module) noexcept
     for (std::size_t index = 0; index < imports.size(); ++index)
     {
         const ImportRequirement& import = imports[index];
+        if (import.ordinal > std::numeric_limits<std::uint16_t>::max())
+        {
+            return Refuse(ValidationError::ImportOrdinalOutOfRange,
+                          "import ordinal does not fit Xenia's export identity");
+        }
+        for (std::size_t previous = 0; previous < index; ++previous)
+        {
+            if (imports[previous].address == import.address ||
+                imports[previous].record_address == import.record_address)
+            {
+                return Refuse(ValidationError::ImportAddressConflict,
+                              "multiple imports claim the same guest or record address");
+            }
+        }
         const bool record_inside_image =
             import.record_address >= descriptor.image.base &&
             static_cast<std::uint64_t>(import.record_address) + sizeof(std::uint32_t) <= image_end;
-        const bool function_address =
-            import.kind == ImportKind::Function && IsInside(import.address, code);
+        const bool function_address = import.kind == ImportKind::Function &&
+                                      IsInside(import.address, code) &&
+                                      static_cast<std::uint64_t>(import.address) + 16U <= code_end;
         const bool variable_address =
             import.kind == ImportKind::Variable && import.address == import.record_address &&
             import.address >= descriptor.image.base && import.address < image_end;
@@ -143,8 +158,7 @@ ValidationResult ValidateModule(const GuestModule& module) noexcept
     return {};
 }
 
-ValidationResult ValidateImports(const GuestModule& module,
-                                 std::span<const ImportBinding> bindings) noexcept
+ValidationResult ValidateImports(const GuestModule& module, std::span<const ImportBinding> bindings)
 {
     const std::span<const ImportRequirement> required = module.ImportManifest();
     if (bindings.size() != required.size())
@@ -167,9 +181,11 @@ ValidationResult ValidateImports(const GuestModule& module,
         }
         const bool valid_function = bindings[index].kind == ImportKind::Function &&
                                     bindings[index].function_handler != nullptr &&
-                                    bindings[index].variable_resolver == nullptr;
+                                    bindings[index].variable_resolver == nullptr &&
+                                    bindings[index].variable_resolution_context == nullptr;
         const bool valid_variable = bindings[index].kind == ImportKind::Variable &&
                                     bindings[index].function_handler == nullptr &&
+                                    bindings[index].function_context == nullptr &&
                                     bindings[index].variable_resolver != nullptr;
         if (!valid_function && !valid_variable)
         {

@@ -17,6 +17,8 @@ std::string_view ToString(ValidationError error) noexcept
         "entry-point-outside-code",
         "import-count-mismatch",
         "invalid-import",
+        "import-ordinal-out-of-range",
+        "import-address-conflict",
         "unsorted-import-manifest",
         "import-manifest-digest-mismatch",
         "import-binding-count-mismatch",
