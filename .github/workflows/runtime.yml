@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  XENIA_REVISION: a0239c0d34e2f4abbc480a7db78f0ff0f4836bcc
+  XENIA_REVISION: 802cd9fb062652067601775a490a677ecfe1446f
 
 jobs:
   native-runtime:
@@ -53,7 +53,7 @@ jobs:
         if: runner.os == 'Linux'
         run: >-
           sudo apt-get update &&
-          sudo apt-get install --yes libgtk-3-dev liblz4-dev libsdl2-dev
+          sudo apt-get install --yes libgtk-3-dev liblz4-dev libsdl2-dev libx11-xcb-dev
 
       - name: Install pinned LLVM
         uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0

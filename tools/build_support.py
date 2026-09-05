@@ -79,6 +79,10 @@ def compiler_names() -> tuple[str, str]:
     """Select Clang's native command-line driver for the current host."""
     if os.name == "nt":
         return "clang-cl", "clang-cl"
+    if platform.system() == "Darwin":
+        # Xcode's shims select AppleClang and the active SDK even when a separate
+        # LLVM installation supplies clang-format and clang-tidy on PATH.
+        return "/usr/bin/clang", "/usr/bin/clang++"
     return "clang", "clang++"
 
 
@@ -96,4 +100,5 @@ def cmake_child_environment(c_compiler: str, cxx_compiler: str) -> dict[str, str
 
 
 def python_executable() -> str:
-    return str(pathlib.Path(sys.executable).resolve())
+    # Resolving a venv symlink selects the base Python and loses locked packages.
+    return str(pathlib.Path(sys.executable).absolute())
