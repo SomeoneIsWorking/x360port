@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+include(cmake/Warnings.cmake)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format REQUIRED)
@@ -16,7 +17,7 @@ option(X360PORT_VALIDATION_ONLY
        OFF)
 set(X360PORT_XENIA_SOURCE_DIR "" CACHE PATH
     "Path to the pinned Xenia source checkout used by the x360port executor")
-set(X360PORT_XENIA_REVISION "f04847eb6875e72f889a9e30aac48b7fe51f5fe2")
+set(X360PORT_XENIA_REVISION "9cddd1759f96b0491bfcd933a73ca7eaab1f258b")
 
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp
@@ -34,7 +35,7 @@ add_library(x360port_validation STATIC
     ${X360PORT_VALIDATION_SOURCES}
     ${X360PORT_VALIDATION_HEADERS})
 target_include_directories(x360port_validation PUBLIC include)
-target_compile_options(x360port_validation PRIVATE -Wall -Wextra -Wpedantic -Werror)
+x360port_enable_warnings(x360port_validation)
 
 set(X360PORT_RUNTIME_SOURCES
     src/runtime.cpp
@@ -82,7 +83,7 @@ if(NOT X360PORT_VALIDATION_ONLY)
 
     set(XENIA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(XENIA_BUILD_MISC OFF CACHE BOOL "" FORCE)
-    add_subdirectory("${X360PORT_XENIA_SOURCE_DIR}" xenia EXCLUDE_FROM_ALL)
+    include(cmake/XeniaRegressionTests.cmake)
 
     add_library(x360port STATIC
         ${X360PORT_RUNTIME_SOURCES}
@@ -92,7 +93,7 @@ if(NOT X360PORT_VALIDATION_ONLY)
     target_include_directories(x360port SYSTEM PRIVATE
         "${X360PORT_XENIA_SOURCE_DIR}"
         "${X360PORT_XENIA_SOURCE_DIR}/src")
-    target_compile_options(x360port PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    x360port_enable_warnings(x360port)
     # Xenia changes the GNU libstdc++ container ABI for its Debug objects. The
     # runtime constructs Xenia-owned types, so its translation unit must use the
     # same layout even though x360port's public Pimpl boundary hides those types.
@@ -131,15 +132,18 @@ endif()
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     enable_testing()
 
+    add_library(x360port_warning_probe OBJECT tests/warnings/probe.cpp)
+    x360port_enable_warnings(x360port_warning_probe)
+
     add_executable(x360port_contract_tests tests/contract_tests.cpp)
     target_link_libraries(x360port_contract_tests PRIVATE x360port_validation)
-    target_compile_options(x360port_contract_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    x360port_enable_warnings(x360port_contract_tests)
     add_test(NAME contract COMMAND x360port_contract_tests)
 
     if(NOT X360PORT_VALIDATION_ONLY)
         add_executable(x360port_runtime_tests tests/runtime_tests.cpp)
         target_link_libraries(x360port_runtime_tests PRIVATE x360port)
-        target_compile_options(x360port_runtime_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        x360port_enable_warnings(x360port_runtime_tests)
         add_test(NAME runtime COMMAND x360port_runtime_tests)
     endif()
 
@@ -152,6 +156,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 ${X360PORT_RUNTIME_HEADERS}
                 tests/contract_tests.cpp
                 tests/runtime_tests.cpp
+                tests/warnings/probe.cpp
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(
         NAME clang_tidy
@@ -159,6 +164,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 --warnings-as-errors=*
                 ${X360PORT_VALIDATION_SOURCES}
                 tests/contract_tests.cpp
+                tests/warnings/probe.cpp
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     if(NOT X360PORT_VALIDATION_ONLY)
         add_test(

@@ -19,15 +19,20 @@ def run(
     *,
     cwd: pathlib.Path = ROOT,
     env: Mapping[str, str] | None = None,
-) -> None:
+    input_text: str | None = None,
+    capture_output: bool = False,
+) -> subprocess.CompletedProcess[str]:
     """Run one required command and preserve its exit status."""
     rendered = subprocess.list2cmdline(command)
     print(f"+ {rendered}", flush=True)
-    subprocess.run(  # noqa: S603 - argv has no shell expansion.
+    return subprocess.run(  # noqa: S603 - argv has no shell expansion.
         command,
         cwd=cwd,
         check=True,
         env=env,
+        input=input_text,
+        capture_output=capture_output,
+        text=True,
     )
 
 

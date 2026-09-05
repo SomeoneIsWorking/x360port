@@ -35,7 +35,7 @@ Xenia JIT/import runtime test. Its Ninja build reports all reachable independent
 build failures in one run; any build failure stops verification before CTest.
 
 The required Xenia revision is
-`f04847eb6875e72f889a9e30aac48b7fe51f5fe2` from the maintained
+`9cddd1759f96b0491bfcd933a73ca7eaab1f258b` from the maintained
 `SomeoneIsWorking/xenia-canary` `main` branch; configuration refuses any other
 revision. `-DX360PORT_VALIDATION_ONLY=ON` builds only the synthetic diagnostic
 validator and never claims runtime capability.
