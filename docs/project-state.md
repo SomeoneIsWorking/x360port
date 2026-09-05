@@ -125,6 +125,13 @@ until a green hosted run confirms them. Run `33894756332` exposed a missing Linu
 Xlib/XCB development header, MSVC-only `/MP` passed to clang-cl, and an unprobed
 macOS warning option. The pinned fork fixes compiler-family/capability
 selection, the verifier selects Xcode AppleClang explicitly, and Linux provisioning
-includes `libx11-xcb-dev`. Android is explicitly not
+includes `libx11-xcb-dev`.
+[Windows job 101286402490](https://github.com/SomeoneIsWorking/x360port/actions/runs/33958625790/job/101286402490)
+then exposed a `constexpr HANDLE` initialized with `INVALID_HANDLE_VALUE`, whose
+integer-to-pointer conversion is forbidden in a C++ constant expression. The
+pinned fork now keeps the sentinel immutable with `inline const`. A Clang Windows
+target accepts the actual production declaration; restoring `constexpr` in the
+negative control reproduces the hosted failure. Full Windows runtime execution
+still awaits hosted verification. Android is explicitly not
 represented by a placeholder job: no Android executable/package owner exists to
 run this contract on arm64-v8a yet.
