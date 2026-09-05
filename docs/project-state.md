@@ -149,3 +149,25 @@ capabilities reproduces both undeclared optimized sliders. Full Windows runtime
 execution still awaits hosted verification. Android is explicitly not
 represented by a placeholder job: no Android executable/package owner exists to
 run this contract on arm64-v8a yet.
+
+The next collected hosted failures exposed clang-cl interpreting bare `-Wall`
+as MSVC `/Wall`, incomplete enum-subset switches, implicit Windows function-pointer
+conversions, nontrivial guest-record copies, and detached `jthread` usage unavailable
+in the macOS library. The maintained fork and native-driver warning owner address
+those boundaries without disabling diagnostics. The focused Xenia suite preserves
+guest/texture-key bytes and instruction-key encodings and requires impossible HIR
+types to abort in both Debug and Release. It belongs only to top-level framework
+verification; consuming games do not build this test harness.
+
+Local evidence: the combined Clang build compiles all 240 affected steps, 10/10
+Python tests pass, and 23/25 CTests pass initially. The two fatal probes expose a
+test-discovery newline mismatch in Xenia's console entry; after correcting only
+that parser boundary, both shipping-executable probes and the harness controls
+pass (3/3 focused CTests). All 25 registered checks are covered. A subsequent
+reconfigure/build performs zero compilations. Existing untouched upstream lint
+findings remain; this is not a warning-clean whole-Xenia claim.
+
+Gap: Windows/macOS qualification still requires hosted confirmation. The separate
+tabulate literal-operator correction is not included or pinned: publishing its
+maintained fork is paused for the user's upstream-history decision. No Windows
+success is inferred while that known dependency failure remains.
