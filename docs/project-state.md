@@ -131,7 +131,12 @@ then exposed a `constexpr HANDLE` initialized with `INVALID_HANDLE_VALUE`, whose
 integer-to-pointer conversion is forbidden in a C++ constant expression. The
 pinned fork now keeps the sentinel immutable with `inline const`. A Clang Windows
 target accepts the actual production declaration; restoring `constexpr` in the
-negative control reproduces the hosted failure. Full Windows runtime execution
-still awaits hosted verification. Android is explicitly not
+negative control reproduces the hosted failure.
+[Windows job 101287961139](https://github.com/SomeoneIsWorking/x360port/actions/runs/33959201949/job/101287961139)
+then rejected an impossible null-address check on `Win32Thread::set_name`'s
+by-value string parameter. Removing that guard preserves the platform and
+metadata naming calls; the actual production method compiles with warnings as
+errors, while restoring the guard reproduces the hosted diagnostic. Full Windows
+runtime execution still awaits hosted verification. Android is explicitly not
 represented by a placeholder job: no Android executable/package owner exists to
 run this contract on arm64-v8a yet.
