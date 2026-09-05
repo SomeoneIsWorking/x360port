@@ -34,7 +34,7 @@ and runs CTest including clang-format, clang-tidy, structure checks, and the
 Xenia JIT/import runtime test.
 
 The required Xenia revision is
-`a0239c0d34e2f4abbc480a7db78f0ff0f4836bcc` from the maintained
+`802cd9fb062652067601775a490a677ecfe1446f` from the maintained
 `SomeoneIsWorking/xenia-canary` `main` branch; configuration refuses any other
 revision. `-DX360PORT_VALIDATION_ONLY=ON` builds only the synthetic diagnostic
 validator and never claims runtime capability.

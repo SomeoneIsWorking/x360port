@@ -121,6 +121,10 @@ Evidence: the locked Python verifier is the only CI entry point and requires the
 real synthetic Xenia runtime tests on a declared host architecture. Linux
 x86-64 is locally green. The pinned workflow definitions cover Linux x86-64,
 Windows x86-64, and Apple Silicon macOS, but their remote runs remain unverified
-until the dependency and consumer commits are pushed. Android is explicitly not
+until a green hosted run confirms them. Run `33894756332` exposed a missing Linux
+Xlib/XCB development header, MSVC-only `/MP` passed to clang-cl, and an unprobed
+macOS warning option. The pinned fork fixes compiler-family/capability
+selection, the verifier selects Xcode AppleClang explicitly, and Linux provisioning
+includes `libx11-xcb-dev`. Android is explicitly not
 represented by a placeholder job: no Android executable/package owner exists to
 run this contract on arm64-v8a yet.

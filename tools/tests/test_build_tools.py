@@ -8,11 +8,29 @@ import tempfile
 import unittest
 from unittest import mock
 
-from build_support import ROOT, cmake_child_environment
+from build_support import ROOT, cmake_child_environment, compiler_names, python_executable
 from xenia_dependencies import prepare_xenia_dependencies
 
 
 class CmakeChildEnvironmentTests(unittest.TestCase):
+    def test_python_handoff_preserves_the_virtual_environment_entry_point(self) -> None:
+        with (
+            mock.patch("build_support.sys.executable", str(ROOT / ".venv/bin/python")),
+            mock.patch("pathlib.Path.resolve", return_value=pathlib.Path("/base/python")),
+        ):
+            self.assertEqual(python_executable(), str(ROOT / ".venv/bin/python"))
+
+    def test_macos_selects_xcode_compilers_independently_of_llvm_path(self) -> None:
+        with (
+            mock.patch("build_support.os.name", "posix"),
+            mock.patch("build_support.platform.system", return_value="Darwin"),
+        ):
+            self.assertEqual(compiler_names(), ("/usr/bin/clang", "/usr/bin/clang++"))
+
+    def test_windows_selects_native_clang_cl_driver(self) -> None:
+        with mock.patch("build_support.os.name", "nt"):
+            self.assertEqual(compiler_names(), ("clang-cl", "clang-cl"))
+
     def test_nested_configures_inherit_ninja_and_exact_compilers(self) -> None:
         original_generator = os.environ.get("CMAKE_GENERATOR")
 
