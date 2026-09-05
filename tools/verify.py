@@ -69,7 +69,9 @@ def verify_runtime(build_dir: pathlib.Path, parallel: int) -> None:
     if parallel < 1:
         raise ValueError("--parallel must be positive")
     cmake = require_program("cmake")
-    run((cmake, "--build", str(build_dir), "--parallel", str(parallel)))
+    # configure() guarantees Ninja. Collect independent compiler failures in one
+    # build; run() still raises on failure before any runtime tests can execute.
+    run((cmake, "--build", str(build_dir), "--parallel", str(parallel), "--", "-k", "0"))
     run((require_program("ctest"), "--test-dir", str(build_dir), "--output-on-failure"))
 
 
