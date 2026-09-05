@@ -31,7 +31,8 @@ uv run --frozen python tools/verify.py --xenia-source /path/to/xenia
 The verifier selects Clang and Ninja, refuses build output outside `build/`,
 runs Python quality checks, builds the real executor and synthetic fixtures,
 and runs CTest including clang-format, clang-tidy, structure checks, and the
-Xenia JIT/import runtime test.
+Xenia JIT/import runtime test. Its Ninja build reports all reachable independent
+build failures in one run; any build failure stops verification before CTest.
 
 The required Xenia revision is
 `f04847eb6875e72f889a9e30aac48b7fe51f5fe2` from the maintained
