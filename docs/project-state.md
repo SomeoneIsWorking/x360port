@@ -136,7 +136,16 @@ negative control reproduces the hosted failure.
 then rejected an impossible null-address check on `Win32Thread::set_name`'s
 by-value string parameter. Removing that guard preserves the platform and
 metadata naming calls; the actual production method compiles with warnings as
-errors, while restoring the guard reproduces the hosted diagnostic. Full Windows
-runtime execution still awaits hosted verification. Android is explicitly not
+errors, while restoring the guard reproduces the hosted diagnostic.
+[Windows job 101289741182](https://github.com/SomeoneIsWorking/x360port/actions/runs/33959862352/job/101289741182)
+then exposed incomplete builtin/ISA configuration in Xenia's duplicate zlib-ng
+build. Xenia now consumes the pinned library's CMake target: that owner probes
+compiler capabilities, selects SIMD sources and per-file flags, and exports
+generated headers from the binary directory. The XLast consumer uses that header
+interface. The rebuilt native graph passes the runtime suite and a linked
+compression roundtrip/malformed-input discriminator. The actual x86 header and
+production target definitions compile under clang-cl; removing the builtin
+capabilities reproduces both undeclared optimized sliders. Full Windows runtime
+execution still awaits hosted verification. Android is explicitly not
 represented by a placeholder job: no Android executable/package owner exists to
 run this contract on arm64-v8a yet.
