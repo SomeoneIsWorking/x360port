@@ -16,6 +16,7 @@ namespace
 using namespace x360port;
 
 constexpr GuestAddress kCodeAddress = 0x82000000;
+constexpr GuestAddress kSelfModifyingAddress = kCodeAddress + 48;
 constexpr GuestAddress kDeviceReadAddress = kCodeAddress + 8;
 constexpr GuestAddress kDeviceWriteAddress = kCodeAddress + 24;
 constexpr std::uint32_t kDeviceAddress = 0xC0001000;
@@ -65,6 +66,15 @@ class TestModule final : public GuestModule
                           0x38, 0x60, 0x00, 0x07, // li r3, 7
                           0x4E, 0x80, 0x00, 0x20, // blr
                       });
+        CopyBytes(48, {
+                          0x3C, 0x60, 0x82, 0x00, // lis r3, 0x8200
+                          0x60, 0x63, 0x00, 0x00, // ori r3, r3, 0
+                          0x3C, 0x80, 0x38, 0x60, // lis r4, 0x3860
+                          0x60, 0x84, 0x00, 0x2B, // ori r4, r4, 43
+                          0x90, 0x83, 0x00, 0x00, // stw r4, 0(r3)
+                          0x38, 0x60, 0x00, 0x09, // li r3, 9
+                          0x4E, 0x80, 0x00, 0x20, // blr
+                      });
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -97,7 +107,7 @@ class TestModule final : public GuestModule
         }
     }
 
-    std::array<std::byte, 48> image_{};
+    std::array<std::byte, 80> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -293,6 +303,17 @@ int main()
     Require(created.context->Statistics().execution_calls == 2,
             "the cache-hit call was not counted");
 
+    ExecutionResult self_modifying = created.context->Execute(kSelfModifyingAddress);
+    Require(static_cast<bool>(self_modifying), self_modifying.failure.detail);
+    Require(self_modifying.value == 9,
+            "the self-modifying guest function returned the wrong value");
+    Require(created.context->Statistics().observed_executable_writes != 0,
+            "Xenia did not observe the guest executable write");
+    ExecutionResult automatically_invalidated = created.context->Execute(kCodeAddress);
+    Require(static_cast<bool>(automatically_invalidated), automatically_invalidated.failure.detail);
+    Require(automatically_invalidated.value == 43,
+            "automatic executable invalidation did not expose the modified guest code");
+
     ExecutionResult outside = created.context->Execute(kCodeAddress + 0x1000);
     Require(!outside, "an entry outside authenticated code executed");
     Require(outside.failure.error == RuntimeError::EntryOutsideCode,
@@ -356,7 +377,7 @@ int main()
 
     const std::uint64_t translations_before_invalidation =
         recreated.context->Statistics().translated_functions;
-    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 47, 2);
+    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 79, 2);
     Require(loaded.error == RuntimeError::ExecutableRangeInvalid,
             "an executable write outside the authenticated code range was accepted");
     loaded = recreated.context->NotifyExecutableWrite(kDeviceReadAddress, 4);
