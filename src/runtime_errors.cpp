@@ -51,6 +51,10 @@ std::string_view ToString(RuntimeError error) noexcept
         return "device-memory range registration failed";
     case RuntimeError::ExecutableRangeInvalid:
         return "invalid executable write range";
+    case RuntimeError::GuestMemoryAllocationFailed:
+        return "guest memory allocation failed";
+    case RuntimeError::GuestMemoryRangeInvalid:
+        return "invalid guest memory range";
     }
     return "unknown runtime error";
 }

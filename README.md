@@ -49,3 +49,10 @@ validator and never claims runtime capability.
 Title addresses, identities, imports, overrides, and policies remain in their
 title repositories. No generated function map, generated entry ABI, standalone
 guest-memory window, or static dispatcher belongs here.
+
+Title adapters may request bounded caller-owned guest allocations through
+`RuntimeContext::AllocateGuestMemory`, initialize them with
+`WriteGuestMemory`, and release them with `ReleaseGuestMemory`. The shared
+owner tracks each complete allocation and rejects writes or releases that do
+not stay within or exactly match a live range; it does not expose an
+unbounded guest-memory window or title policy.

@@ -257,6 +257,20 @@ int main()
     Require(concurrent.failure.error == RuntimeError::InstanceAlreadyActive,
             "the concurrent-context refusal was not typed");
 
+    GuestMemoryAllocationResult guest_allocation = created.context->AllocateGuestMemory(0x20U);
+    Require(static_cast<bool>(guest_allocation), guest_allocation.failure.detail);
+    const std::array<std::byte, 4> guest_bytes{std::byte{0x12}, std::byte{0x34}, std::byte{0x56},
+                                               std::byte{0x78}};
+    RuntimeFailure guest_write =
+        created.context->WriteGuestMemory(guest_allocation.allocation.address + 4U, guest_bytes);
+    Require(!guest_write, guest_write.detail);
+    guest_write =
+        created.context->WriteGuestMemory(guest_allocation.allocation.address + 0x1FU, guest_bytes);
+    Require(guest_write.error == RuntimeError::GuestMemoryRangeInvalid,
+            "a guest-memory write outside its allocation was accepted");
+    guest_write = created.context->ReleaseGuestMemory(guest_allocation.allocation);
+    Require(!guest_write, guest_write.detail);
+
     TestModule module;
     RuntimeFailure loaded = created.context->LoadModule(module, {});
     Require(!loaded, loaded.detail);
