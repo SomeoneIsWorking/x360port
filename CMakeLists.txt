@@ -45,6 +45,7 @@ endif()
 set(X360PORT_RUNTIME_SOURCES
     src/device_dispatch.cpp
     src/executable_invalidation.cpp
+    src/guest_memory.cpp
     src/override_dispatch.cpp
     src/runtime.cpp
     src/runtime_errors.cpp
@@ -57,6 +58,7 @@ set(X360PORT_RUNTIME_HEADERS
     include/x360port/runtime.hpp
     src/device_dispatch.hpp
     src/executable_invalidation.hpp
+    src/guest_memory.hpp
     src/guest_call_frame.hpp
     src/override_dispatch.hpp
     src/runtime_imports.hpp

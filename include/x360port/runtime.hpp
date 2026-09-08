@@ -38,6 +38,8 @@ enum class RuntimeError : std::uint8_t
     DeviceRangeInvalid,
     DeviceRangeRegistrationFailed,
     ExecutableRangeInvalid,
+    GuestMemoryAllocationFailed,
+    GuestMemoryRangeInvalid,
 };
 
 struct RuntimeFailure
@@ -46,6 +48,25 @@ struct RuntimeFailure
     std::string detail;
 
     [[nodiscard]] explicit operator bool() const noexcept { return error != RuntimeError::None; }
+};
+
+struct GuestMemoryAllocation
+{
+    GuestAddress address = 0;
+    std::uint32_t size = 0;
+
+    [[nodiscard]] explicit operator bool() const noexcept { return address != 0 && size != 0; }
+};
+
+struct GuestMemoryAllocationResult
+{
+    GuestMemoryAllocation allocation;
+    RuntimeFailure failure;
+
+    [[nodiscard]] explicit operator bool() const noexcept
+    {
+        return static_cast<bool>(allocation) && !failure;
+    }
 };
 
 class RuntimeContext;
@@ -90,6 +111,11 @@ class RuntimeContext final
     ~RuntimeContext();
 
     [[nodiscard]] static RuntimeCreateResult Create();
+
+    [[nodiscard]] GuestMemoryAllocationResult AllocateGuestMemory(std::uint32_t size);
+    [[nodiscard]] RuntimeFailure WriteGuestMemory(GuestAddress address,
+                                                  std::span<const std::byte> bytes);
+    [[nodiscard]] RuntimeFailure ReleaseGuestMemory(GuestMemoryAllocation allocation);
 
     [[nodiscard]] RuntimeFailure LoadModule(const GuestModule& module,
                                             std::span<const ImportBinding> bindings);

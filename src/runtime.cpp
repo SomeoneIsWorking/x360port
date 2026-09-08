@@ -3,6 +3,7 @@
 #include "device_dispatch.hpp"
 #include "executable_invalidation.hpp"
 #include "guest_call_frame.hpp"
+#include "guest_memory.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
 #include "xenia_backend.hpp"
@@ -96,6 +97,7 @@ class RuntimeContext::Impl final
         }
         export_resolver_.reset();
         imports_.reset();
+        guest_memory_.Reset();
         memory_.reset();
 
         if (owns_instance_)
@@ -125,6 +127,7 @@ class RuntimeContext::Impl final
             return Failure(RuntimeError::MemoryInitializationFailed,
                            "Xenia Memory::Initialize refused its guest address-space mapping");
         }
+        guest_memory_.Initialize(*memory_);
 
         export_resolver_ = std::make_unique<xe::cpu::ExportResolver>();
         processor_ = std::make_unique<xe::cpu::Processor>(memory_.get(), export_resolver_.get());
@@ -243,6 +246,22 @@ class RuntimeContext::Impl final
         invalidation_ = std::make_unique<ExecutableInvalidation>(*processor_, statistics_);
         image_reservation.Commit();
         return {};
+    }
+
+    [[nodiscard]] GuestMemoryAllocationResult AllocateGuestMemory(std::uint32_t size)
+    {
+        return guest_memory_.Allocate(size);
+    }
+
+    [[nodiscard]] RuntimeFailure WriteGuestMemory(GuestAddress address,
+                                                  std::span<const std::byte> bytes)
+    {
+        return guest_memory_.Write(address, bytes);
+    }
+
+    [[nodiscard]] RuntimeFailure ReleaseGuestMemory(GuestMemoryAllocation allocation)
+    {
+        return guest_memory_.Release(allocation);
     }
 
     [[nodiscard]] RuntimeFailure InstallOverride(GuestAddress address,
@@ -374,6 +393,7 @@ class RuntimeContext::Impl final
     bool owns_instance_ = false;
     bool load_failed_ = false;
     std::unique_ptr<xe::Memory> memory_;
+    GuestMemory guest_memory_;
     std::unique_ptr<xe::cpu::ExportResolver> export_resolver_;
     std::unique_ptr<xe::cpu::Processor> processor_;
     std::unique_ptr<xe::cpu::ThreadState> thread_state_;
@@ -402,6 +422,22 @@ RuntimeCreateResult RuntimeContext::Create()
         return {nullptr, std::move(failure)};
     }
     return {std::unique_ptr<RuntimeContext>(new RuntimeContext(std::move(impl))), {}};
+}
+
+GuestMemoryAllocationResult RuntimeContext::AllocateGuestMemory(std::uint32_t size)
+{
+    return impl_->AllocateGuestMemory(size);
+}
+
+RuntimeFailure RuntimeContext::WriteGuestMemory(GuestAddress address,
+                                                std::span<const std::byte> bytes)
+{
+    return impl_->WriteGuestMemory(address, bytes);
+}
+
+RuntimeFailure RuntimeContext::ReleaseGuestMemory(GuestMemoryAllocation allocation)
+{
+    return impl_->ReleaseGuestMemory(allocation);
 }
 
 RuntimeFailure RuntimeContext::LoadModule(const GuestModule& module,
