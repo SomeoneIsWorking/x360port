@@ -32,6 +32,9 @@ enum class RuntimeError : std::uint8_t
     EntryOutsideCode,
     TranslationFailed,
     ExecutionFailed,
+    OverrideInvalid,
+    OverrideAlreadyInstalled,
+    OverrideNotInstalled,
 };
 
 struct RuntimeFailure
@@ -42,12 +45,7 @@ struct RuntimeFailure
     [[nodiscard]] explicit operator bool() const noexcept { return error != RuntimeError::None; }
 };
 
-struct JitStatistics
-{
-    std::uint64_t translated_functions = 0;
-    std::uint64_t emitted_host_bytes = 0;
-    std::uint64_t execution_calls = 0;
-};
+class RuntimeContext;
 
 struct ExecutionResult
 {
@@ -57,7 +55,20 @@ struct ExecutionResult
     [[nodiscard]] explicit operator bool() const noexcept { return !failure; }
 };
 
-class RuntimeContext;
+using NativeOverrideHandler = ExecutionResult (*)(RuntimeContext& runtime, GuestAddress address,
+                                                  std::span<const std::uint64_t> arguments,
+                                                  void* context) noexcept;
+
+struct JitStatistics
+{
+    std::uint64_t translated_functions = 0;
+    std::uint64_t emitted_host_bytes = 0;
+    std::uint64_t execution_calls = 0;
+    std::uint64_t native_override_calls = 0;
+    std::uint64_t original_calls = 0;
+    std::uint64_t translation_invalidations = 0;
+};
+
 struct RuntimeCreateResult;
 
 class RuntimeContext final
@@ -73,8 +84,16 @@ class RuntimeContext final
 
     [[nodiscard]] RuntimeFailure LoadModule(const GuestModule& module,
                                             std::span<const ImportBinding> bindings);
+    // Installs a title-owned native implementation at an image address. The
+    // handler may call CallOriginal to re-enter Xenia for one scoped original
+    // invocation; Execute never routes that call back through the override.
+    [[nodiscard]] RuntimeFailure
+    InstallOverride(GuestAddress address, NativeOverrideHandler handler, void* context = nullptr);
+    [[nodiscard]] RuntimeFailure RemoveOverride(GuestAddress address);
     [[nodiscard]] ExecutionResult Execute(GuestAddress address,
                                           std::span<const std::uint64_t> arguments = {});
+    [[nodiscard]] ExecutionResult CallOriginal(GuestAddress address,
+                                               std::span<const std::uint64_t> arguments = {});
 
     [[nodiscard]] const JitStatistics& Statistics() const noexcept;
 

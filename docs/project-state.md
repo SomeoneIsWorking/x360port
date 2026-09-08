@@ -17,7 +17,7 @@ static or interpreter product path.
 | S007 | Xenia A64 execution is qualified on Android arm64-v8a | missing | S003, S004 | G001 |
 | S008 | Typed function and variable imports execute through Xenia exports | verified | S002, S003, S004 | G001, G002 |
 | S009 | Device-memory callbacks have a title-neutral runtime boundary | missing | S003, S004 | G001 |
-| S010 | Image-aware overrides and scoped original calls use Xenia dispatch | missing | S003, S004, S008 | G001 |
+| S010 | Image-aware overrides and scoped original calls use Xenia dispatch | partial | S003, S004, S008 | G001 |
 | S011 | Guest calls have bounded exit and refusal contracts | partial | S003, S004 | G001 |
 | S012 | Executable writes invalidate Xenia translations coherently | missing | S003, S004 | G001 |
 | S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
@@ -93,8 +93,16 @@ for device-backed guest ranges without importing title or engine policy.
 
 ### S010 — overrides and original calls
 
-Missing capability: dispatch image-authenticated overrides through Xenia and
-scope an original call so it suppresses exactly one matching override.
+Evidence: `RuntimeContext::InstallOverride` and `CallOriginal` dispatch a
+validated guest entry through a title-owned native handler, let that handler
+re-enter the same guest address through Xenia without recursion, and invalidate
+the address entry when the override is installed or removed. The runtime test
+proves native result wrapping, original-call and invalidation counters, and
+restored dynarec execution.
+
+Gap: this is only the public entry-dispatch contract. A real Gears image must
+exercise the authenticated leaf and prove internal guest call paths, executable
+writes, and title override bindings invalidate all affected Xenia translations.
 
 ### S011 — bounded calls
 

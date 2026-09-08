@@ -38,11 +38,13 @@ target_include_directories(x360port_validation PUBLIC include)
 x360port_enable_warnings(x360port_validation)
 
 set(X360PORT_RUNTIME_SOURCES
+    src/override_dispatch.cpp
     src/runtime.cpp
     src/runtime_imports.cpp
 )
 set(X360PORT_RUNTIME_HEADERS
     include/x360port/runtime.hpp
+    src/override_dispatch.hpp
     src/runtime_imports.hpp
 )
 
