@@ -36,9 +36,12 @@ gap is automatic write observation and internal guest-call routing.
 
 ### S001 — image validation
 
-Evidence: `x360port_contract_tests` carries independent SHA-256 known answers
-and mutations of every authenticated image/layout field, including a malformed
-image base that must receive a typed refusal before Xenia fixed allocation.
+Evidence: `x360port_contract_tests` carries independent SHA-256 known answers,
+the shared PE-to-flat-image positive discriminator, and malformed source/geometry
+refusals. The retained module validator still mutates every authenticated
+image/layout field, including a malformed image base that must receive a typed
+refusal before Xenia fixed allocation. `x360port::MapPeImage` preserves the
+normalized source digest separately from the flat runtime-image digest.
 
 ### S002 — import validation
 
