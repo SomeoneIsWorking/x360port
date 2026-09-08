@@ -35,6 +35,8 @@ enum class RuntimeError : std::uint8_t
     OverrideInvalid,
     OverrideAlreadyInstalled,
     OverrideNotInstalled,
+    DeviceRangeInvalid,
+    DeviceRangeRegistrationFailed,
 };
 
 struct RuntimeFailure
@@ -59,6 +61,10 @@ using NativeOverrideHandler = ExecutionResult (*)(RuntimeContext& runtime, Guest
                                                   std::span<const std::uint64_t> arguments,
                                                   void* context) noexcept;
 
+using DeviceReadCallback = std::uint32_t (*)(std::uint32_t address, void* context) noexcept;
+using DeviceWriteCallback = void (*)(std::uint32_t address, std::uint32_t value,
+                                     void* context) noexcept;
+
 struct JitStatistics
 {
     std::uint64_t translated_functions = 0;
@@ -67,6 +73,8 @@ struct JitStatistics
     std::uint64_t native_override_calls = 0;
     std::uint64_t original_calls = 0;
     std::uint64_t translation_invalidations = 0;
+    std::uint64_t device_read_calls = 0;
+    std::uint64_t device_write_calls = 0;
 };
 
 struct RuntimeCreateResult;
@@ -90,6 +98,11 @@ class RuntimeContext final
     [[nodiscard]] RuntimeFailure
     InstallOverride(GuestAddress address, NativeOverrideHandler handler, void* context = nullptr);
     [[nodiscard]] RuntimeFailure RemoveOverride(GuestAddress address);
+    [[nodiscard]] RuntimeFailure RegisterDeviceMemoryRange(std::uint32_t address,
+                                                           std::uint32_t mask, std::uint32_t size,
+                                                           DeviceReadCallback read_callback,
+                                                           DeviceWriteCallback write_callback,
+                                                           void* context = nullptr);
     [[nodiscard]] ExecutionResult Execute(GuestAddress address,
                                           std::span<const std::uint64_t> arguments = {});
     [[nodiscard]] ExecutionResult CallOriginal(GuestAddress address,

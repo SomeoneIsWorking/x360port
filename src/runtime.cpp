@@ -1,5 +1,7 @@
 #include "x360port/runtime.hpp"
 
+#include "device_dispatch.hpp"
+#include "guest_call_frame.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
 
@@ -77,32 +79,6 @@ class GuestRangeReservation final
   private:
     xe::BaseHeap* heap_;
     std::uint32_t address_;
-};
-
-class GuestCallFrame final
-{
-  public:
-    explicit GuestCallFrame(xe::cpu::ppc::PPCContext& context) noexcept
-        : context_(context), previous_stack_pointer_(context.r[1]),
-          previous_link_register_(context.lr)
-    {
-        context_.r[1] -= 64 + 112;
-        context_.lr = kReturnAddress;
-    }
-
-    GuestCallFrame(const GuestCallFrame&) = delete;
-    GuestCallFrame& operator=(const GuestCallFrame&) = delete;
-
-    ~GuestCallFrame()
-    {
-        context_.lr = previous_link_register_;
-        context_.r[1] = previous_stack_pointer_;
-    }
-
-  private:
-    xe::cpu::ppc::PPCContext& context_;
-    std::uint64_t previous_stack_pointer_;
-    std::uint64_t previous_link_register_;
 };
 
 } // namespace
@@ -289,6 +265,16 @@ class RuntimeContext::Impl final
         return overrides_.Remove(address, InvalidateEntry, this);
     }
 
+    [[nodiscard]] RuntimeFailure RegisterDeviceMemoryRange(std::uint32_t address,
+                                                           std::uint32_t mask, std::uint32_t size,
+                                                           DeviceReadCallback read_callback,
+                                                           DeviceWriteCallback write_callback,
+                                                           void* context)
+    {
+        return devices_.Register(*memory_, address, mask, size, read_callback, write_callback,
+                                 context);
+    }
+
     [[nodiscard]] ExecutionResult Execute(RuntimeContext& owner, GuestAddress address,
                                           std::span<const std::uint64_t> arguments)
     {
@@ -349,7 +335,7 @@ class RuntimeContext::Impl final
         {
             context->r[3 + index] = arguments[index];
         }
-        const GuestCallFrame call_frame(*context);
+        const GuestCallFrame call_frame(*context, kReturnAddress);
         const bool executed = function->Call(thread_state_.get(), kReturnAddress);
         if (!executed)
         {
@@ -392,6 +378,7 @@ class RuntimeContext::Impl final
     std::uint32_t image_address_ = 0;
     OverrideDispatch overrides_;
     JitStatistics statistics_{};
+    DeviceDispatch devices_{statistics_};
 };
 
 RuntimeContext::RuntimeContext(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {}
@@ -424,6 +411,16 @@ RuntimeFailure RuntimeContext::InstallOverride(GuestAddress address, NativeOverr
 RuntimeFailure RuntimeContext::RemoveOverride(GuestAddress address)
 {
     return impl_->RemoveOverride(address);
+}
+
+RuntimeFailure RuntimeContext::RegisterDeviceMemoryRange(std::uint32_t address, std::uint32_t mask,
+                                                         std::uint32_t size,
+                                                         DeviceReadCallback read_callback,
+                                                         DeviceWriteCallback write_callback,
+                                                         void* context)
+{
+    return impl_->RegisterDeviceMemoryRange(address, mask, size, read_callback, write_callback,
+                                            context);
 }
 
 ExecutionResult RuntimeContext::Execute(GuestAddress address,
@@ -482,6 +479,10 @@ std::string_view ToString(RuntimeError error) noexcept
         return "native override already installed";
     case RuntimeError::OverrideNotInstalled:
         return "native override not installed";
+    case RuntimeError::DeviceRangeInvalid:
+        return "invalid device-memory range";
+    case RuntimeError::DeviceRangeRegistrationFailed:
+        return "device-memory range registration failed";
     }
     return "unknown runtime error";
 }

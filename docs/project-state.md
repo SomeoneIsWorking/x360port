@@ -16,7 +16,7 @@ static or interpreter product path.
 | S006 | Xenia A64 execution is qualified on Apple Silicon macOS | missing | S003, S004 | G001 |
 | S007 | Xenia A64 execution is qualified on Android arm64-v8a | missing | S003, S004 | G001 |
 | S008 | Typed function and variable imports execute through Xenia exports | verified | S002, S003, S004 | G001, G002 |
-| S009 | Device-memory callbacks have a title-neutral runtime boundary | missing | S003, S004 | G001 |
+| S009 | Device-memory callbacks have a title-neutral runtime boundary | verified | S003, S004 | G001 |
 | S010 | Image-aware overrides and scoped original calls use Xenia dispatch | partial | S003, S004, S008 | G001 |
 | S011 | Guest calls have bounded exit and refusal contracts | partial | S003, S004 | G001 |
 | S012 | Executable writes invalidate Xenia translations coherently | missing | S003, S004 | G001 |
@@ -25,10 +25,11 @@ static or interpreter product path.
 
 ## Current focus
 
-S009 is the current focus. The real `x360port` target executes authenticated PPC
+S010 is the current focus. The real `x360port` target executes authenticated PPC
 through Xenia's x64 dynarec and its typed function and variable imports cross
-Xenia's production export machinery. The next shared runtime gap is a narrow
-device-backed guest-memory callback boundary.
+Xenia's production export machinery. The device-backed guest-memory callback
+boundary is now proven; the next shared gap is coherent invalidation for
+executable guest writes and internal guest-call paths.
 
 ## Capability details
 
@@ -88,8 +89,11 @@ the caller's manifest and binding objects leave scope.
 
 ### S009 — device-memory callbacks
 
-Missing capability: define and execute a narrow title-neutral callback contract
-for device-backed guest ranges without importing title or engine policy.
+Evidence: `RuntimeContext::RegisterDeviceMemoryRange` validates and registers a
+title-neutral masked range through Xenia `Memory::AddVirtualMappedRange`. The
+runtime test executes synthetic PPC `lwz` and `stw` instructions, checks both
+callback values and addresses, and proves read/write counters. The callbacks
+remain owned by the runtime context rather than by title or engine policy.
 
 ### S010 — overrides and original calls
 
