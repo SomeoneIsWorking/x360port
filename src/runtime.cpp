@@ -5,6 +5,7 @@
 #include "guest_call_frame.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
+#include "xenia_backend.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -13,15 +14,6 @@
 #include <mutex>
 #include <utility>
 
-#include "xenia/base/platform.h"
-#include "xenia/cpu/backend/backend.h"
-#if XE_ARCH_AMD64
-#include "xenia/cpu/backend/x64/x64_backend.h"
-#elif XE_ARCH_ARM64
-#include "xenia/cpu/backend/a64/a64_backend.h"
-#else
-#error "x360port requires a Xenia x64 or A64 dynarec backend"
-#endif
 #include "xenia/cpu/function.h"
 #include "xenia/cpu/ppc/ppc_context.h"
 #include "xenia/cpu/processor.h"
@@ -45,15 +37,6 @@ bool g_instance_active = false;
 [[nodiscard]] RuntimeFailure Failure(RuntimeError error, std::string detail)
 {
     return RuntimeFailure{error, std::move(detail)};
-}
-
-[[nodiscard]] std::unique_ptr<xe::cpu::backend::Backend> CreateHostBackend()
-{
-#if XE_ARCH_AMD64
-    return std::make_unique<xe::cpu::backend::x64::X64Backend>();
-#elif XE_ARCH_ARM64
-    return std::make_unique<xe::cpu::backend::a64::A64Backend>();
-#endif
 }
 
 class GuestRangeReservation final
@@ -140,7 +123,7 @@ class RuntimeContext::Impl final
 
         export_resolver_ = std::make_unique<xe::cpu::ExportResolver>();
         processor_ = std::make_unique<xe::cpu::Processor>(memory_.get(), export_resolver_.get());
-        if (!processor_->Setup(CreateHostBackend()))
+        if (!processor_->Setup(CreateXeniaHostBackend()))
         {
             return Failure(RuntimeError::BackendInitializationFailed,
                            "Xenia Processor::Setup refused the host dynarec backend");
