@@ -1,5 +1,6 @@
 #include "x360port/runtime.hpp"
 
+#include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
 
 #include <algorithm>
@@ -272,12 +273,44 @@ class RuntimeContext::Impl final
         return {};
     }
 
-    [[nodiscard]] ExecutionResult Execute(GuestAddress address,
+    [[nodiscard]] RuntimeFailure InstallOverride(GuestAddress address,
+                                                 NativeOverrideHandler handler, void* context)
+    {
+        if (module_ == nullptr)
+        {
+            return Failure(RuntimeError::LoadStateInvalid,
+                           "native overrides require an authenticated image to be loaded");
+        }
+        return overrides_.Install(address, handler, context, code_range_, InvalidateEntry, this);
+    }
+
+    [[nodiscard]] RuntimeFailure RemoveOverride(GuestAddress address)
+    {
+        return overrides_.Remove(address, InvalidateEntry, this);
+    }
+
+    [[nodiscard]] ExecutionResult Execute(RuntimeContext& owner, GuestAddress address,
                                           std::span<const std::uint64_t> arguments)
     {
-        if (module_ == nullptr || address < code_range_.base ||
-            static_cast<std::uint64_t>(address) >=
-                static_cast<std::uint64_t>(code_range_.base) + code_range_.size)
+        if (const auto override = overrides_.Find(address); override.has_value())
+        {
+            ++statistics_.native_override_calls;
+            return override->handler(owner, address, arguments, override->context);
+        }
+        return ExecuteOriginal(address, arguments);
+    }
+
+    [[nodiscard]] ExecutionResult CallOriginal(GuestAddress address,
+                                               std::span<const std::uint64_t> arguments)
+    {
+        ++statistics_.original_calls;
+        return ExecuteOriginal(address, arguments);
+    }
+
+    [[nodiscard]] ExecutionResult ExecuteOriginal(GuestAddress address,
+                                                  std::span<const std::uint64_t> arguments)
+    {
+        if (!IsInCodeRange(address))
         {
             return {Failure(RuntimeError::EntryOutsideCode,
                             "guest entry is outside the authenticated executable range"),
@@ -332,6 +365,20 @@ class RuntimeContext::Impl final
     [[nodiscard]] const JitStatistics& Statistics() const noexcept { return statistics_; }
 
   private:
+    static void InvalidateEntry(void* context, GuestAddress address) noexcept
+    {
+        auto& runtime = *static_cast<Impl*>(context);
+        runtime.processor_->RemoveFunctionByAddress(address);
+        ++runtime.statistics_.translation_invalidations;
+    }
+
+    [[nodiscard]] bool IsInCodeRange(GuestAddress address) const noexcept
+    {
+        return module_ != nullptr && address >= code_range_.base &&
+               static_cast<std::uint64_t>(address) <
+                   static_cast<std::uint64_t>(code_range_.base) + code_range_.size;
+    }
+
     bool owns_instance_ = false;
     bool load_failed_ = false;
     std::unique_ptr<xe::Memory> memory_;
@@ -343,6 +390,7 @@ class RuntimeContext::Impl final
     CodeRange code_range_{};
     std::uint32_t stack_address_ = 0;
     std::uint32_t image_address_ = 0;
+    OverrideDispatch overrides_;
     JitStatistics statistics_{};
 };
 
@@ -367,10 +415,27 @@ RuntimeFailure RuntimeContext::LoadModule(const GuestModule& module,
     return impl_->LoadModule(module, bindings);
 }
 
+RuntimeFailure RuntimeContext::InstallOverride(GuestAddress address, NativeOverrideHandler handler,
+                                               void* context)
+{
+    return impl_->InstallOverride(address, handler, context);
+}
+
+RuntimeFailure RuntimeContext::RemoveOverride(GuestAddress address)
+{
+    return impl_->RemoveOverride(address);
+}
+
 ExecutionResult RuntimeContext::Execute(GuestAddress address,
                                         std::span<const std::uint64_t> arguments)
 {
-    return impl_->Execute(address, arguments);
+    return impl_->Execute(*this, address, arguments);
+}
+
+ExecutionResult RuntimeContext::CallOriginal(GuestAddress address,
+                                             std::span<const std::uint64_t> arguments)
+{
+    return impl_->CallOriginal(address, arguments);
 }
 
 const JitStatistics& RuntimeContext::Statistics() const noexcept { return impl_->Statistics(); }
@@ -411,6 +476,12 @@ std::string_view ToString(RuntimeError error) noexcept
         return "translation failed";
     case RuntimeError::ExecutionFailed:
         return "execution failed";
+    case RuntimeError::OverrideInvalid:
+        return "invalid native override";
+    case RuntimeError::OverrideAlreadyInstalled:
+        return "native override already installed";
+    case RuntimeError::OverrideNotInstalled:
+        return "native override not installed";
     }
     return "unknown runtime error";
 }

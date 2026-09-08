@@ -67,6 +67,24 @@ struct ImportObservations
     std::uint32_t variable_resolutions = 0;
 };
 
+struct OverrideObservations
+{
+    std::uint32_t calls = 0;
+};
+
+ExecutionResult AddOneThroughOriginal(RuntimeContext& runtime, GuestAddress address,
+                                      std::span<const std::uint64_t> arguments,
+                                      void* context) noexcept
+{
+    ++static_cast<OverrideObservations*>(context)->calls;
+    ExecutionResult original = runtime.CallOriginal(address, arguments);
+    if (original)
+    {
+        ++original.value;
+    }
+    return original;
+}
+
 void FunctionImport(void*, void*, void* context) noexcept
 {
     ++static_cast<ImportObservations*>(context)->function_calls;
@@ -212,6 +230,30 @@ int main()
     ExecutionResult after_recreate = recreated.context->Execute(kCodeAddress);
     Require(static_cast<bool>(after_recreate), after_recreate.failure.detail);
     Require(after_recreate.value == 42, "the recreated runtime returned the wrong value");
+
+    OverrideObservations override_observations;
+    loaded = recreated.context->InstallOverride(kCodeAddress, AddOneThroughOriginal,
+                                                &override_observations);
+    Require(!loaded, loaded.detail);
+    ExecutionResult overridden = recreated.context->Execute(kCodeAddress);
+    Require(static_cast<bool>(overridden), overridden.failure.detail);
+    Require(overridden.value == 43, "the native override did not wrap the original guest call");
+    Require(override_observations.calls == 1,
+            "the native override handler was not called exactly once");
+    Require(recreated.context->Statistics().native_override_calls == 1,
+            "the native override dispatch was not counted");
+    Require(recreated.context->Statistics().original_calls == 1,
+            "the scoped original call was not counted");
+    Require(recreated.context->Statistics().translation_invalidations == 1,
+            "installing the native override did not invalidate the guest entry");
+
+    loaded = recreated.context->RemoveOverride(kCodeAddress);
+    Require(!loaded, loaded.detail);
+    ExecutionResult restored = recreated.context->Execute(kCodeAddress);
+    Require(static_cast<bool>(restored), restored.failure.detail);
+    Require(restored.value == 42, "removing the native override did not restore guest execution");
+    Require(recreated.context->Statistics().translation_invalidations == 2,
+            "removing the native override did not invalidate the guest entry");
 
     recreated.context.reset();
     RuntimeCreateResult imported = RuntimeContext::Create();
