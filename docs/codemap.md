@@ -5,6 +5,7 @@
 | Module/import schemas and canonical digests | `include/x360port/module_contract.hpp` | Adapt exact parsed Xenia module metadata without copying title policy. |
 | Fail-closed image/import validation | `include/x360port/validation.hpp`, `src/{module_validation,digest,validation}.cpp` | Run before title activation or guest execution. |
 | Xenia context and guest call ownership | `include/x360port/runtime.hpp`, `src/runtime.cpp` | Extend through narrow typed runtime contracts; keep Xenia types behind the Pimpl boundary. |
+| Device-backed guest memory | `include/x360port/runtime.hpp`, `src/device_dispatch.{hpp,cpp}` | Register title-supplied masked ranges through Xenia `Memory`; own callback lifetime and access telemetry without importing title policy. |
 | Xenia export/import attachment and callback lifetime | `src/runtime_imports.{hpp,cpp}` | Keep manifest-owned names/tables alive through resolver teardown; bind only validated title-neutral imports. |
 | Library implementation tree | `src/` | Add only cohesive title-neutral x360port owners behind public interfaces. |
 | Contract falsifiers | `tests/contract_tests.cpp` | Keep synthetic known answers; add production-boundary Xenia cases. |

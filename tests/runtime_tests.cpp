@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <initializer_list>
 #include <iostream>
 #include <span>
 #include <string_view>
@@ -15,6 +16,9 @@ namespace
 using namespace x360port;
 
 constexpr GuestAddress kCodeAddress = 0x82000000;
+constexpr GuestAddress kDeviceReadAddress = kCodeAddress + 8;
+constexpr GuestAddress kDeviceWriteAddress = kCodeAddress + 24;
+constexpr std::uint32_t kDeviceAddress = 0xC0001000;
 constexpr GuestAddress kImportedCallAddress = 0x83000000;
 constexpr GuestAddress kFunctionImportAddress = kImportedCallAddress + 0x20;
 constexpr GuestAddress kVariableCallAddress = kImportedCallAddress + 0x30;
@@ -35,6 +39,32 @@ class TestModule final : public GuestModule
         {
             image_[index] = static_cast<std::byte>(kReturnFortyTwo[index]);
         }
+        CopyBytes(8, {
+                         0x3C,
+                         0x60,
+                         0xC0,
+                         0x00, // lis r3, 0xc000
+                         0x60,
+                         0x63,
+                         0x10,
+                         0x00, // ori r3, r3, 0x1000
+                         0x80,
+                         0x63,
+                         0x00,
+                         0x00, // lwz r3, 0(r3)
+                         0x4E,
+                         0x80,
+                         0x00,
+                         0x20, // blr
+                     });
+        CopyBytes(24, {
+                          0x3C, 0x60, 0xC0, 0x00, // lis r3, 0xc000
+                          0x60, 0x63, 0x10, 0x00, // ori r3, r3, 0x1000
+                          0x38, 0x80, 0x00, 0x63, // li r4, 99
+                          0x90, 0x83, 0x00, 0x04, // stw r4, 4(r3)
+                          0x38, 0x60, 0x00, 0x07, // li r3, 7
+                          0x4E, 0x80, 0x00, 0x20, // blr
+                      });
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -57,7 +87,17 @@ class TestModule final : public GuestModule
     }
 
   private:
-    std::array<std::byte, kReturnFortyTwo.size()> image_{};
+    void CopyBytes(std::size_t offset, std::initializer_list<std::uint8_t> bytes)
+    {
+        std::size_t index = 0;
+        for (const std::uint8_t byte : bytes)
+        {
+            image_[offset + index] = static_cast<std::byte>(byte);
+            ++index;
+        }
+    }
+
+    std::array<std::byte, 48> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -70,6 +110,28 @@ struct ImportObservations
 struct OverrideObservations
 {
     std::uint32_t calls = 0;
+};
+
+struct DeviceObservations
+{
+    std::uint32_t reads = 0;
+    std::uint32_t writes = 0;
+    std::uint32_t last_write_address = 0;
+    std::uint32_t last_write_value = 0;
+};
+
+std::uint32_t DeviceRead(std::uint32_t, void* context) noexcept
+{
+    ++static_cast<DeviceObservations*>(context)->reads;
+    return 0x12345678;
+}
+
+constexpr auto DeviceWrite = [](const auto address, const auto value, void* context) noexcept
+{
+    auto& observations = *static_cast<DeviceObservations*>(context);
+    ++observations.writes;
+    observations.last_write_address = address;
+    observations.last_write_value = value;
 };
 
 ExecutionResult AddOneThroughOriginal(RuntimeContext& runtime, GuestAddress address,
@@ -254,6 +316,29 @@ int main()
     Require(restored.value == 42, "removing the native override did not restore guest execution");
     Require(recreated.context->Statistics().translation_invalidations == 2,
             "removing the native override did not invalidate the guest entry");
+
+    DeviceObservations device_observations;
+    loaded = recreated.context->RegisterDeviceMemoryRange(
+        kDeviceAddress, 0xFFFFF000, 0x1000, nullptr, DeviceWrite, &device_observations);
+    Require(loaded.error == RuntimeError::DeviceRangeInvalid,
+            "a null device read callback was accepted");
+    loaded = recreated.context->RegisterDeviceMemoryRange(
+        kDeviceAddress, 0xFFFFF000, 0x1000, DeviceRead, DeviceWrite, &device_observations);
+    Require(!loaded, loaded.detail);
+    ExecutionResult device_read = recreated.context->Execute(kDeviceReadAddress);
+    Require(static_cast<bool>(device_read), device_read.failure.detail);
+    Require(device_read.value == 0x12345678U, "the device read returned the wrong value");
+    ExecutionResult device_write = recreated.context->Execute(kDeviceWriteAddress);
+    Require(static_cast<bool>(device_write), device_write.failure.detail);
+    Require(device_write.value == 7, "the device store leaf returned the wrong value");
+    Require(device_observations.reads == 1 && device_observations.writes == 1,
+            "device callbacks did not run exactly once");
+    Require(device_observations.last_write_address == kDeviceAddress + 4 &&
+                device_observations.last_write_value == 99,
+            "the device write callback observed the wrong address or value");
+    Require(recreated.context->Statistics().device_read_calls == 1 &&
+                recreated.context->Statistics().device_write_calls == 1,
+            "device callback telemetry did not count both accesses");
 
     recreated.context.reset();
     RuntimeCreateResult imported = RuntimeContext::Create();

@@ -6,16 +6,25 @@ symptom: x360port executes authenticated imported PPC but lacks the remaining ti
 state_items: S005,S009,S010,S011,S012
 tags: xenia,dynarec,executor
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-08
 ---
 
 ## Root cause
 
 The bounded Xenia owner, x64 JIT call, and typed function/variable import path
-now exist. The remaining root cause is that device-backed memory,
-override/original dispatch, bounded non-returning execution, and executable
+now exist. The remaining root cause is that override/original dispatch,
+bounded non-returning execution, and executable
 invalidation are not connected to Xenia's production owners. A real title
 module therefore still cannot complete its runtime boundary.
+
+## Progress note — 2026-09-08
+
+`RuntimeContext::RegisterDeviceMemoryRange` now validates and owns masked
+device ranges, registers them through Xenia `Memory::AddVirtualMappedRange`,
+and reports read/write telemetry. The runtime discriminator executes both
+synthetic PPC load and store instructions and checks callback values, addresses,
+and counters. This closes S009 only; bounded exits, internal guest-call routing,
+and executable-write invalidation remain open.
 
 ## Resolution condition
 
