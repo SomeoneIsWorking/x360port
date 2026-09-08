@@ -28,6 +28,7 @@ namespace
 
 constexpr std::uint32_t kThreadId = 0x360;
 constexpr std::uint32_t kStackSize = 64 * 1024;
+constexpr std::uint32_t kPcrSize = 0x1000;
 constexpr std::uint32_t kReturnAddress = 0xBCBCBCBC;
 constexpr std::size_t kRegisterArgumentCount = 8;
 
@@ -80,6 +81,10 @@ class RuntimeContext::Impl final
         if (memory_ != nullptr && stack_address_ != 0)
         {
             memory_->SystemHeapFree(stack_address_);
+        }
+        if (memory_ != nullptr && pcr_address_ != 0)
+        {
+            memory_->SystemHeapFree(pcr_address_);
         }
         processor_.reset();
         if (memory_ != nullptr && image_address_ != 0)
@@ -135,8 +140,14 @@ class RuntimeContext::Impl final
             return Failure(RuntimeError::StackAllocationFailed,
                            "Xenia could not allocate the bounded guest call stack");
         }
-        thread_state_ = std::make_unique<xe::cpu::ThreadState>(processor_.get(), kThreadId,
-                                                               stack_address_ + kStackSize);
+        pcr_address_ = memory_->SystemHeapAlloc(kPcrSize);
+        if (pcr_address_ == 0)
+        {
+            return Failure(RuntimeError::StackAllocationFailed,
+                           "Xenia could not allocate the guest thread PCR");
+        }
+        thread_state_ = std::make_unique<xe::cpu::ThreadState>(
+            processor_.get(), kThreadId, stack_address_ + kStackSize, pcr_address_);
         processor_->PreLaunch();
         return {};
     }
@@ -371,6 +382,7 @@ class RuntimeContext::Impl final
     xe::cpu::RawModule* module_ = nullptr;
     CodeRange code_range_{};
     std::uint32_t stack_address_ = 0;
+    std::uint32_t pcr_address_ = 0;
     std::uint32_t image_address_ = 0;
     OverrideDispatch overrides_;
     JitStatistics statistics_{};
