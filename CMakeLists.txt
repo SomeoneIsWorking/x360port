@@ -17,7 +17,7 @@ option(X360PORT_VALIDATION_ONLY
        OFF)
 set(X360PORT_XENIA_SOURCE_DIR "" CACHE PATH
     "Path to the pinned Xenia source checkout used by the x360port executor")
-set(X360PORT_XENIA_REVISION "9cddd1759f96b0491bfcd933a73ca7eaab1f258b")
+set(X360PORT_XENIA_REVISION "5d14ad55e9e4a004382585b58996ffedf2f6e35e")
 
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp
@@ -46,6 +46,9 @@ set(X360PORT_RUNTIME_SOURCES
     src/runtime.cpp
     src/runtime_errors.cpp
     src/runtime_imports.cpp
+    src/xenia_backend.cpp
+    src/xex_helpers.cpp
+    src/xex_inspect.cpp
 )
 set(X360PORT_RUNTIME_HEADERS
     include/x360port/runtime.hpp
@@ -54,6 +57,9 @@ set(X360PORT_RUNTIME_HEADERS
     src/guest_call_frame.hpp
     src/override_dispatch.hpp
     src/runtime_imports.hpp
+    src/xenia_backend.hpp
+    src/xex_helpers.hpp
+    include/x360port/xex_inspect.hpp
 )
 
 if(NOT X360PORT_VALIDATION_ONLY)
@@ -108,7 +114,7 @@ if(NOT X360PORT_VALIDATION_ONLY)
     # runtime constructs Xenia-owned types, so its translation unit must use the
     # same layout even though x360port's public Pimpl boundary hides those types.
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_compile_definitions(x360port PRIVATE $<$<CONFIG:Debug>:_GLIBCXX_DEBUG>)
+        target_compile_definitions(x360port PUBLIC $<$<CONFIG:Debug>:_GLIBCXX_DEBUG>)
     endif()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
         set(X360PORT_XENIA_BACKEND_TARGET xenia-cpu-backend-x64)
@@ -137,6 +143,10 @@ if(NOT X360PORT_VALIDATION_ONLY)
             x360port_validation
             ${X360PORT_XENIA_LIBRARIES})
     endif()
+    add_executable(xex_inspect tools/xex_inspect.cpp)
+    target_link_libraries(xex_inspect PRIVATE x360port)
+    x360port_enable_warnings(xex_inspect)
+    set_target_properties(xex_inspect PROPERTIES OUTPUT_NAME "x360-xex-inspect")
 endif()
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -155,6 +165,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         target_link_libraries(x360port_runtime_tests PRIVATE x360port)
         x360port_enable_warnings(x360port_runtime_tests)
         add_test(NAME runtime COMMAND x360port_runtime_tests)
+
+        add_executable(x360port_xex_inspect_tests tests/xex_inspect_tests.cpp)
+        target_link_libraries(x360port_xex_inspect_tests PRIVATE x360port)
+        x360port_enable_warnings(x360port_xex_inspect_tests)
+        add_test(NAME xex_inspect COMMAND x360port_xex_inspect_tests)
     endif()
 
     add_test(
@@ -166,7 +181,9 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 ${X360PORT_RUNTIME_HEADERS}
                 tests/contract_tests.cpp
                 tests/runtime_tests.cpp
+                tests/xex_inspect_tests.cpp
                 tests/warnings/probe.cpp
+                tools/xex_inspect.cpp
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(
         NAME clang_tidy
@@ -183,6 +200,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                     --warnings-as-errors=*
                     ${X360PORT_RUNTIME_SOURCES}
                     tests/runtime_tests.cpp
+                    tests/xex_inspect_tests.cpp
+                    src/xenia_backend.cpp
+                    src/xex_helpers.cpp
+                    src/xex_inspect.cpp
+                    tools/xex_inspect.cpp
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
     add_test(NAME structure

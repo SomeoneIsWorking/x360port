@@ -34,8 +34,14 @@ and runs CTest including clang-format, clang-tidy, structure checks, and the
 Xenia JIT/import runtime test. Its Ninja build reports all reachable independent
 build failures in one run; any build failure stops verification before CTest.
 
+The runtime build also provides `x360-xex-inspect`, which accepts a user-owned
+XEX2, refuses malformed container and payload bounds, and emits a strict JSON
+inspection plus the canonical normalized image when requested with
+`--image-out`. It is an input/identity boundary only; it does not launch a title
+or provide a gameplay fallback.
+
 The required Xenia revision is
-`9cddd1759f96b0491bfcd933a73ca7eaab1f258b` from the maintained
+`5d14ad55e9e4a004382585b58996ffedf2f6e35e` from the maintained
 `SomeoneIsWorking/xenia-canary` `main` branch; configuration refuses any other
 revision. `-DX360PORT_VALIDATION_ONLY=ON` builds only the synthetic diagnostic
 validator and never claims runtime capability.

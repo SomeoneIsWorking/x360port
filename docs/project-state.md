@@ -22,6 +22,7 @@ static or interpreter product path.
 | S012 | Executable writes invalidate Xenia translations coherently | partial | S003, S004 | G001 |
 | S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
 | S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
+| S015 | Checked XEX2 inspection and canonical normalized-image output | verified | S001, S002, S003, S004 | G001, G002 |
 
 ## Current focus
 
@@ -192,3 +193,21 @@ Gap: Windows/macOS qualification still requires hosted confirmation. The separat
 tabulate literal-operator correction is not included or pinned: publishing its
 maintained fork is paused for the user's upstream-history decision. No Windows
 success is inferred while that known dependency failure remains.
+
+### S015 — checked XEX2 inspection
+
+Evidence: `x360-xex-inspect` validates XEX2 header, security geometry, file-format
+and payload bounds before entering Xenia, then uses the pinned Xenia loader's
+decryption/decompression path, canonicalizes import records and function stubs,
+maps the PE, and reports execution metadata, ordered logical imports, and the
+eight register save/restore helper scans. The real ignored Gears 1 XEX produces
+the existing checked authority's 13,500,416-byte image with SHA-256
+`f61cc78e4057bc68a2c65386a0341f6d26a7add3dfd9918007a455750ec6ed5c`, 17
+sections, 236 imports, and one hit for each helper pattern. Focused negative
+tests reject truncated, non-XEX2, payload-less, window-less, and AES-misaligned
+inputs. The pinned Xenia fork also bounds basic/normal-compression reads before
+copying or decompressing untrusted blocks.
+
+Gap: the inspector is a shared loading contract, not yet the complete Gears
+title adapter; authenticated image binding, runtime services, and the real leaf
+round-trip remain in S005.

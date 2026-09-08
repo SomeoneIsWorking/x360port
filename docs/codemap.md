@@ -4,6 +4,7 @@
 |---|---|---|
 | Module/import schemas and canonical digests | `include/x360port/module_contract.hpp` | Adapt exact parsed Xenia module metadata without copying title policy. |
 | PE image layout adapter | `include/x360port/pe_image.hpp`, `src/pe_image.cpp` | Validate an Xbox 360 PE container's geometry and map its sections into the flat guest image contract; preserve source and runtime-image digests separately. |
+| Checked XEX2 inspection | `include/x360port/xex_inspect.hpp`, `src/xex_inspect.cpp`, `tools/xex_inspect.cpp` | Own fail-closed XEX2 header/payload handoff to the pinned Xenia loader, canonical import-record/function-stub normalization, PE mapping, execution metadata, logical imports, and helper-pattern evidence. It has no title identity or import policy. |
 | Fail-closed image/import validation | `include/x360port/validation.hpp`, `src/{module_validation,digest,validation}.cpp` | Run before title activation or guest execution. |
 | Xenia context and guest call ownership | `include/x360port/runtime.hpp`, `src/runtime.cpp` | Extend through narrow typed runtime contracts; keep Xenia types behind the Pimpl boundary. |
 | Device-backed guest memory | `include/x360port/runtime.hpp`, `src/device_dispatch.{hpp,cpp}` | Register title-supplied masked ranges through Xenia `Memory`; own callback lifetime and access telemetry without importing title policy. |
