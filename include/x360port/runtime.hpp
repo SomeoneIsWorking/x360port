@@ -37,6 +37,7 @@ enum class RuntimeError : std::uint8_t
     OverrideNotInstalled,
     DeviceRangeInvalid,
     DeviceRangeRegistrationFailed,
+    ExecutableRangeInvalid,
 };
 
 struct RuntimeFailure
@@ -103,6 +104,7 @@ class RuntimeContext final
                                                            DeviceReadCallback read_callback,
                                                            DeviceWriteCallback write_callback,
                                                            void* context = nullptr);
+    [[nodiscard]] RuntimeFailure NotifyExecutableWrite(GuestAddress address, std::uint32_t size);
     [[nodiscard]] ExecutionResult Execute(GuestAddress address,
                                           std::span<const std::uint64_t> arguments = {});
     [[nodiscard]] ExecutionResult CallOriginal(GuestAddress address,

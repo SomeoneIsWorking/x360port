@@ -1,6 +1,7 @@
 #include "x360port/runtime.hpp"
 
 #include "device_dispatch.hpp"
+#include "executable_invalidation.hpp"
 #include "guest_call_frame.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
@@ -245,6 +246,7 @@ class RuntimeContext::Impl final
         module_ = registered_module;
         code_range_ = descriptor.code;
         image_address_ = descriptor.image.base;
+        invalidation_ = std::make_unique<ExecutableInvalidation>(*processor_, statistics_);
         image_reservation.Commit();
         return {};
     }
@@ -273,6 +275,16 @@ class RuntimeContext::Impl final
     {
         return devices_.Register(*memory_, address, mask, size, read_callback, write_callback,
                                  context);
+    }
+
+    [[nodiscard]] RuntimeFailure NotifyExecutableWrite(GuestAddress address, std::uint32_t size)
+    {
+        if (invalidation_ == nullptr)
+        {
+            return Failure(RuntimeError::LoadStateInvalid,
+                           "executable writes require an authenticated image to be loaded");
+        }
+        return invalidation_->Notify(code_range_, address, size);
     }
 
     [[nodiscard]] ExecutionResult Execute(RuntimeContext& owner, GuestAddress address,
@@ -371,6 +383,7 @@ class RuntimeContext::Impl final
     std::unique_ptr<xe::cpu::ExportResolver> export_resolver_;
     std::unique_ptr<xe::cpu::Processor> processor_;
     std::unique_ptr<xe::cpu::ThreadState> thread_state_;
+    std::unique_ptr<ExecutableInvalidation> invalidation_;
     std::unique_ptr<RuntimeImports> imports_;
     xe::cpu::RawModule* module_ = nullptr;
     CodeRange code_range_{};
@@ -423,6 +436,11 @@ RuntimeFailure RuntimeContext::RegisterDeviceMemoryRange(std::uint32_t address, 
                                             context);
 }
 
+RuntimeFailure RuntimeContext::NotifyExecutableWrite(GuestAddress address, std::uint32_t size)
+{
+    return impl_->NotifyExecutableWrite(address, size);
+}
+
 ExecutionResult RuntimeContext::Execute(GuestAddress address,
                                         std::span<const std::uint64_t> arguments)
 {
@@ -436,55 +454,5 @@ ExecutionResult RuntimeContext::CallOriginal(GuestAddress address,
 }
 
 const JitStatistics& RuntimeContext::Statistics() const noexcept { return impl_->Statistics(); }
-
-std::string_view ToString(RuntimeError error) noexcept
-{
-    switch (error)
-    {
-    case RuntimeError::None:
-        return "none";
-    case RuntimeError::InstanceAlreadyActive:
-        return "instance already active";
-    case RuntimeError::MemoryInitializationFailed:
-        return "memory initialization failed";
-    case RuntimeError::BackendInitializationFailed:
-        return "dynarec backend initialization failed";
-    case RuntimeError::StackAllocationFailed:
-        return "guest stack allocation failed";
-    case RuntimeError::ModuleAlreadyLoaded:
-        return "module already loaded";
-    case RuntimeError::ModuleValidationFailed:
-        return "module validation failed";
-    case RuntimeError::ImportValidationFailed:
-        return "import validation failed";
-    case RuntimeError::VariableResolutionFailed:
-        return "variable import resolution failed";
-    case RuntimeError::ImportAttachmentFailed:
-        return "Xenia import attachment failed";
-    case RuntimeError::LoadStateInvalid:
-        return "runtime load state invalid";
-    case RuntimeError::ImageAllocationFailed:
-        return "guest image allocation failed";
-    case RuntimeError::ModuleRegistrationFailed:
-        return "RawModule registration failed";
-    case RuntimeError::EntryOutsideCode:
-        return "entry outside code";
-    case RuntimeError::TranslationFailed:
-        return "translation failed";
-    case RuntimeError::ExecutionFailed:
-        return "execution failed";
-    case RuntimeError::OverrideInvalid:
-        return "invalid native override";
-    case RuntimeError::OverrideAlreadyInstalled:
-        return "native override already installed";
-    case RuntimeError::OverrideNotInstalled:
-        return "native override not installed";
-    case RuntimeError::DeviceRangeInvalid:
-        return "invalid device-memory range";
-    case RuntimeError::DeviceRangeRegistrationFailed:
-        return "device-memory range registration failed";
-    }
-    return "unknown runtime error";
-}
 
 } // namespace x360port

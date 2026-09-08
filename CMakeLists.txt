@@ -39,13 +39,16 @@ x360port_enable_warnings(x360port_validation)
 
 set(X360PORT_RUNTIME_SOURCES
     src/device_dispatch.cpp
+    src/executable_invalidation.cpp
     src/override_dispatch.cpp
     src/runtime.cpp
+    src/runtime_errors.cpp
     src/runtime_imports.cpp
 )
 set(X360PORT_RUNTIME_HEADERS
     include/x360port/runtime.hpp
     src/device_dispatch.hpp
+    src/executable_invalidation.hpp
     src/guest_call_frame.hpp
     src/override_dispatch.hpp
     src/runtime_imports.hpp

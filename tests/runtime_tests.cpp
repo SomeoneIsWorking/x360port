@@ -340,6 +340,28 @@ int main()
                 recreated.context->Statistics().device_write_calls == 1,
             "device callback telemetry did not count both accesses");
 
+    const std::uint64_t translations_before_invalidation =
+        recreated.context->Statistics().translated_functions;
+    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 47, 2);
+    Require(loaded.error == RuntimeError::ExecutableRangeInvalid,
+            "an executable write outside the authenticated code range was accepted");
+    loaded = recreated.context->NotifyExecutableWrite(kDeviceReadAddress, 4);
+    Require(!loaded, loaded.detail);
+    ExecutionResult device_read_after_write = recreated.context->Execute(kDeviceReadAddress);
+    Require(static_cast<bool>(device_read_after_write), device_read_after_write.failure.detail);
+    Require(device_read_after_write.value == 0x12345678U,
+            "the invalidated device read returned the wrong value");
+    Require(recreated.context->Statistics().translated_functions ==
+                translations_before_invalidation + 1,
+            "an executable write did not invalidate the affected translated function");
+    ExecutionResult device_write_after_read_invalidation =
+        recreated.context->Execute(kDeviceWriteAddress);
+    Require(static_cast<bool>(device_write_after_read_invalidation),
+            device_write_after_read_invalidation.failure.detail);
+    Require(recreated.context->Statistics().translated_functions ==
+                translations_before_invalidation + 1,
+            "an executable write invalidated an unrelated translated function");
+
     recreated.context.reset();
     RuntimeCreateResult imported = RuntimeContext::Create();
     Require(static_cast<bool>(imported), imported.failure.detail);

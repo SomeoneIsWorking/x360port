@@ -19,17 +19,18 @@ static or interpreter product path.
 | S009 | Device-memory callbacks have a title-neutral runtime boundary | verified | S003, S004 | G001 |
 | S010 | Image-aware overrides and scoped original calls use Xenia dispatch | partial | S003, S004, S008 | G001 |
 | S011 | Guest calls have bounded exit and refusal contracts | partial | S003, S004 | G001 |
-| S012 | Executable writes invalidate Xenia translations coherently | missing | S003, S004 | G001 |
+| S012 | Executable writes invalidate Xenia translations coherently | partial | S003, S004 | G001 |
 | S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
 | S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
 
 ## Current focus
 
-S010 is the current focus. The real `x360port` target executes authenticated PPC
+S012 is the current focus. The real `x360port` target executes authenticated PPC
 through Xenia's x64 dynarec and its typed function and variable imports cross
 Xenia's production export machinery. The device-backed guest-memory callback
-boundary is now proven; the next shared gap is coherent invalidation for
-executable guest writes and internal guest-call paths.
+boundary is now proven; explicit executable-write notification now invalidates
+affected cached functions while preserving unrelated entries. The next shared
+gap is automatic write observation and internal guest-call routing.
 
 ## Capability details
 
@@ -117,8 +118,13 @@ or cancellation/exit contract for guest code that does not return.
 
 ### S012 — executable invalidation
 
-Missing capability: prove executable guest writes invalidate affected Xenia
-translations and leave unrelated cached functions intact.
+Evidence: `RuntimeContext::NotifyExecutableWrite` validates a non-empty range
+inside the authenticated code range, finds every cached Xenia function touched
+by the aligned PPC write range, and removes each function once. The runtime
+test re-translates a touched device-read leaf while an unrelated device-write
+leaf remains cached. Gap: the title memory owner must call this notification
+when an executable write is committed; automatic write observation is not yet
+part of this embedding.
 
 ### S013 — x64 JIT execution
 
