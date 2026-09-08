@@ -22,10 +22,12 @@ set(X360PORT_XENIA_REVISION "9cddd1759f96b0491bfcd933a73ca7eaab1f258b")
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp
     src/module_validation.cpp
+    src/pe_image.cpp
     src/validation.cpp
 )
 set(X360PORT_VALIDATION_HEADERS
     include/x360port/module_contract.hpp
+    include/x360port/pe_image.hpp
     include/x360port/validation.hpp
 )
 
