@@ -113,8 +113,8 @@ writes, and title override bindings invalidate all affected Xenia translations.
 
 Evidence: entry addresses are constrained to authenticated code, the call ABI
 accepts at most eight register arguments, and LR/SP are restored through an
-exception-safe call frame. Missing capability: a runtime-owned execution budget
-or cancellation/exit contract for guest code that does not return.
+exception-safe call frame. Gap: a runtime-owned execution budget or
+cancellation/exit contract for guest code that does not return.
 
 ### S012 — executable invalidation
 
