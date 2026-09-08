@@ -23,8 +23,10 @@ module therefore still cannot complete its runtime boundary.
 device ranges, registers them through Xenia `Memory::AddVirtualMappedRange`,
 and reports read/write telemetry. The runtime discriminator executes both
 synthetic PPC load and store instructions and checks callback values, addresses,
-and counters. This closes S009 only; bounded exits, internal guest-call routing,
-and executable-write invalidation remain open.
+and counters. `RuntimeContext::NotifyExecutableWrite` now also validates a
+title-reported PPC write range, removes affected cached Xenia functions, and
+proves an unrelated function remains cached. Automatic write observation,
+bounded exits, and internal guest-call routing remain open.
 
 ## Resolution condition
 
