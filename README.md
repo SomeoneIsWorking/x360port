@@ -41,7 +41,7 @@ inspection plus the canonical normalized image when requested with
 or provide a gameplay fallback.
 
 The required Xenia revision is
-`5d14ad55e9e4a004382585b58996ffedf2f6e35e` from the maintained
+`b4cefff4f2d05be80134bcfd749cf2a916d3e831` from the maintained
 `SomeoneIsWorking/xenia-canary` `main` branch; configuration refuses any other
 revision. `-DX360PORT_VALIDATION_ONLY=ON` builds only the synthetic diagnostic
 validator and never claims runtime capability.
