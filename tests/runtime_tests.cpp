@@ -17,6 +17,7 @@ using namespace x360port;
 
 constexpr GuestAddress kCodeAddress = 0x82000000;
 constexpr GuestAddress kSelfModifyingAddress = kCodeAddress + 48;
+constexpr GuestAddress kInternalCallerAddress = kCodeAddress + 80;
 constexpr GuestAddress kDeviceReadAddress = kCodeAddress + 8;
 constexpr GuestAddress kDeviceWriteAddress = kCodeAddress + 24;
 constexpr std::uint32_t kDeviceAddress = 0xC0001000;
@@ -75,6 +76,14 @@ class TestModule final : public GuestModule
                           0x38, 0x60, 0x00, 0x09, // li r3, 9
                           0x4E, 0x80, 0x00, 0x20, // blr
                       });
+        CopyBytes(80, {
+                          0x7C, 0x08, 0x02, 0xA6, // mflr r0
+                          0x48, 0x00, 0x00, 0x0D, // bl +12, to 0x82000060
+                          0x7C, 0x08, 0x03, 0xA6, // mtlr r0
+                          0x4E, 0x80, 0x00, 0x20, // blr
+                          0x38, 0x60, 0x00, 0x11, // li r3, 17
+                          0x4E, 0x80, 0x00, 0x20, // blr
+                      });
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -107,7 +116,7 @@ class TestModule final : public GuestModule
         }
     }
 
-    std::array<std::byte, 80> image_{};
+    std::array<std::byte, 108> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -303,6 +312,21 @@ int main()
     Require(created.context->Statistics().execution_calls == 2,
             "the cache-hit call was not counted");
 
+    const std::uint64_t translations_before_internal_call =
+        created.context->Statistics().translated_functions;
+    ExecutionResult internal_call = created.context->Execute(kInternalCallerAddress);
+    Require(static_cast<bool>(internal_call), internal_call.failure.detail);
+    Require(internal_call.value == 17, "the internal guest call returned the wrong value");
+    Require(created.context->Statistics().translated_functions > translations_before_internal_call,
+            "the internal guest call did not translate through Xenia");
+    const std::uint64_t translations_after_internal_call =
+        created.context->Statistics().translated_functions;
+    internal_call = created.context->Execute(kInternalCallerAddress);
+    Require(static_cast<bool>(internal_call), internal_call.failure.detail);
+    Require(internal_call.value == 17, "the cached internal guest call returned the wrong value");
+    Require(created.context->Statistics().translated_functions == translations_after_internal_call,
+            "the cached internal guest call translated again");
+
     ExecutionResult self_modifying = created.context->Execute(kSelfModifyingAddress);
     Require(static_cast<bool>(self_modifying), self_modifying.failure.detail);
     Require(self_modifying.value == 9,
@@ -377,7 +401,7 @@ int main()
 
     const std::uint64_t translations_before_invalidation =
         recreated.context->Statistics().translated_functions;
-    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 79, 2);
+    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 107, 2);
     Require(loaded.error == RuntimeError::ExecutableRangeInvalid,
             "an executable write outside the authenticated code range was accepted");
     loaded = recreated.context->NotifyExecutableWrite(kDeviceReadAddress, 4);
