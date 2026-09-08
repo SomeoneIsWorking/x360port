@@ -1,3 +1,4 @@
+#include "x360port/pe_image.hpp"
 #include "x360port/validation.hpp"
 
 #include <algorithm>
@@ -135,6 +136,73 @@ void TestSha256KnownAnswer()
     if (HashBytes(Input) != Expected)
     {
         std::fprintf(stderr, "FAIL SHA-256 known-answer test for abc\n");
+        ++failures;
+    }
+}
+
+void TestPeImageLayout()
+{
+    std::vector<std::byte> source(0x400U);
+    const auto put16 = [&source](std::size_t offset, std::uint16_t value)
+    {
+        source[offset] = static_cast<std::byte>(value);
+        source[offset + 1U] = static_cast<std::byte>(value >> 8U);
+    };
+    const auto put32 = [&source](std::size_t offset, std::uint32_t value)
+    {
+        for (std::size_t index = 0; index < 4U; ++index)
+        {
+            source[offset + index] =
+                static_cast<std::byte>(value >> static_cast<unsigned>(index * 8U));
+        }
+    };
+    source[0] = std::byte{'M'};
+    source[1] = std::byte{'Z'};
+    put32(0x3cU, 0x80U);
+    put32(0x80U, 0x00004550U);
+    put16(0x84U, 0x01f2U);
+    put16(0x86U, 1U);
+    put16(0x94U, 224U);
+    put16(0x98U, 0x10bU);
+    put32(0xa8U, 0x1000U);
+    put32(0xb4U, 0x82000000U);
+    put32(0xb8U, 0x1000U);
+    put32(0xd0U, 0x2000U);
+    put32(0xd4U, 0x200U);
+    const std::size_t section = 0x178U;
+    source[section] = std::byte{'.'};
+    source[section + 1U] = std::byte{'t'};
+    source[section + 2U] = std::byte{'e'};
+    source[section + 3U] = std::byte{'x'};
+    source[section + 4U] = std::byte{'t'};
+    put32(section + 8U, 0x1000U);
+    put32(section + 12U, 0x1000U);
+    put32(section + 16U, 0x200U);
+    put32(section + 20U, 0x200U);
+    put32(section + 36U, 0x60000020U);
+    source[0x200U] = std::byte{0x4e};
+    source[0x201U] = std::byte{0x80};
+    source[0x202U] = std::byte{0x00};
+    source[0x203U] = std::byte{0x20};
+
+    const PeImageLayoutResult mapped = MapPeImage(source);
+    ++checks;
+    if (!mapped || mapped.layout.identity.base != 0x82000000U ||
+        mapped.layout.identity.entry_point != 0x82001000U ||
+        mapped.layout.code.base != 0x82001000U || mapped.layout.image.size() != 0x2000U ||
+        mapped.layout.image[0x1000U] != std::byte{0x4e} || mapped.layout.sections.size() != 1U)
+    {
+        std::fprintf(stderr, "FAIL PE image layout positive discriminator: %s\n",
+                     mapped.error.c_str());
+        ++failures;
+    }
+
+    put32(section + 16U, 0x300U);
+    const PeImageLayoutResult refused = MapPeImage(source);
+    ++checks;
+    if (refused)
+    {
+        std::fprintf(stderr, "FAIL PE image layout accepted an out-of-bounds section\n");
         ++failures;
     }
 }
@@ -304,6 +372,7 @@ void TestErrorCoverage()
 int main()
 {
     TestSha256KnownAnswer();
+    TestPeImageLayout();
     TestImportDigestCoverage();
     TestAcceptance();
     TestModuleRefusals();
