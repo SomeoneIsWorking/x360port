@@ -29,9 +29,10 @@ static or interpreter product path.
 S012 is the current focus. The real `x360port` target executes authenticated PPC
 through Xenia's x64 dynarec and its typed function and variable imports cross
 Xenia's production export machinery. The device-backed guest-memory callback
-boundary is now proven; explicit executable-write notification now invalidates
-affected cached functions while preserving unrelated entries. The next shared
-gap is automatic write observation and internal guest-call routing.
+boundary is now proven; executable-write notification and Xenia virtual-memory
+observation now invalidate affected cached functions while preserving unrelated
+entries. The next shared gap is internal guest-call routing and bounded exit
+behavior.
 
 ## Capability details
 
@@ -124,11 +125,15 @@ cancellation/exit contract for guest code that does not return.
 
 Evidence: `RuntimeContext::NotifyExecutableWrite` validates a non-empty range
 inside the authenticated code range, finds every cached Xenia function touched
-by the aligned PPC write range, and removes each function once. The runtime
-test re-translates a touched device-read leaf while an unrelated device-write
-leaf remains cached. Gap: the title memory owner must call this notification
-when an executable write is committed; automatic write observation is not yet
-part of this embedding.
+by the aligned PPC write range, and removes each function once. Xenia's maintained
+virtual-memory watch API now traps writes to the authenticated virtual code range;
+the runtime drains the coalesced range at the next guest-call boundary, resets the
+affected module functions to declared state, and re-translates them from the
+modified guest bytes. The runtime test proves the automatic path with a PPC
+self-modifying leaf, including nonzero observation and the changed return value,
+while preserving unrelated translations. Remaining gap: writes made and then
+executed before the guest returns are not drained mid-call; internal guest-call
+routing must own that boundary before title behavior can rely on it.
 
 ### S013 — x64 JIT execution
 

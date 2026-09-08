@@ -98,6 +98,7 @@ class RuntimeContext::Impl final
         export_resolver_.reset();
         imports_.reset();
         guest_memory_.Reset();
+        invalidation_.reset();
         memory_.reset();
 
         if (owns_instance_)
@@ -244,24 +245,14 @@ class RuntimeContext::Impl final
         code_range_ = descriptor.code;
         image_address_ = descriptor.image.base;
         invalidation_ = std::make_unique<ExecutableInvalidation>(*processor_, statistics_);
+        RuntimeFailure watch_failure = invalidation_->Arm(*memory_, code_range_);
+        if (watch_failure)
+        {
+            load_failed_ = true;
+            return watch_failure;
+        }
         image_reservation.Commit();
         return {};
-    }
-
-    [[nodiscard]] GuestMemoryAllocationResult AllocateGuestMemory(std::uint32_t size)
-    {
-        return guest_memory_.Allocate(size);
-    }
-
-    [[nodiscard]] RuntimeFailure WriteGuestMemory(GuestAddress address,
-                                                  std::span<const std::byte> bytes)
-    {
-        return guest_memory_.Write(address, bytes);
-    }
-
-    [[nodiscard]] RuntimeFailure ReleaseGuestMemory(GuestMemoryAllocation allocation)
-    {
-        return guest_memory_.Release(allocation);
     }
 
     [[nodiscard]] RuntimeFailure InstallOverride(GuestAddress address,
@@ -321,6 +312,13 @@ class RuntimeContext::Impl final
     [[nodiscard]] ExecutionResult ExecuteOriginal(GuestAddress address,
                                                   std::span<const std::uint64_t> arguments)
     {
+        if (invalidation_ != nullptr)
+        {
+            if (const RuntimeFailure failure = invalidation_->DrainObservedWrites())
+            {
+                return {failure, 0};
+            }
+        }
         if (!IsInCodeRange(address))
         {
             return {Failure(RuntimeError::EntryOutsideCode,
@@ -374,6 +372,7 @@ class RuntimeContext::Impl final
     }
 
     [[nodiscard]] const JitStatistics& Statistics() const noexcept { return statistics_; }
+    [[nodiscard]] GuestMemory& GuestMemoryOwner() noexcept { return guest_memory_; }
 
   private:
     static void InvalidateEntry(void* context, GuestAddress address) noexcept
@@ -426,18 +425,18 @@ RuntimeCreateResult RuntimeContext::Create()
 
 GuestMemoryAllocationResult RuntimeContext::AllocateGuestMemory(std::uint32_t size)
 {
-    return impl_->AllocateGuestMemory(size);
+    return impl_->GuestMemoryOwner().Allocate(size);
 }
 
 RuntimeFailure RuntimeContext::WriteGuestMemory(GuestAddress address,
                                                 std::span<const std::byte> bytes)
 {
-    return impl_->WriteGuestMemory(address, bytes);
+    return impl_->GuestMemoryOwner().Write(address, bytes);
 }
 
 RuntimeFailure RuntimeContext::ReleaseGuestMemory(GuestMemoryAllocation allocation)
 {
-    return impl_->ReleaseGuestMemory(allocation);
+    return impl_->GuestMemoryOwner().Release(allocation);
 }
 
 RuntimeFailure RuntimeContext::LoadModule(const GuestModule& module,

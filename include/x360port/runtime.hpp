@@ -38,6 +38,8 @@ enum class RuntimeError : std::uint8_t
     DeviceRangeInvalid,
     DeviceRangeRegistrationFailed,
     ExecutableRangeInvalid,
+    ExecutableWatchRegistrationFailed,
+    ExecutableWatchRearmFailed,
     GuestMemoryAllocationFailed,
     GuestMemoryRangeInvalid,
 };
@@ -95,6 +97,7 @@ struct JitStatistics
     std::uint64_t native_override_calls = 0;
     std::uint64_t original_calls = 0;
     std::uint64_t translation_invalidations = 0;
+    std::uint64_t observed_executable_writes = 0;
     std::uint64_t device_read_calls = 0;
     std::uint64_t device_write_calls = 0;
 };

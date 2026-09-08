@@ -51,6 +51,10 @@ std::string_view ToString(RuntimeError error) noexcept
         return "device-memory range registration failed";
     case RuntimeError::ExecutableRangeInvalid:
         return "invalid executable write range";
+    case RuntimeError::ExecutableWatchRegistrationFailed:
+        return "executable-write observation registration failed";
+    case RuntimeError::ExecutableWatchRearmFailed:
+        return "executable-write observation rearm failed";
     case RuntimeError::GuestMemoryAllocationFailed:
         return "guest memory allocation failed";
     case RuntimeError::GuestMemoryRangeInvalid:
