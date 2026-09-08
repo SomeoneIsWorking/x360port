@@ -38,6 +38,9 @@ add_library(x360port_validation STATIC
     ${X360PORT_VALIDATION_HEADERS})
 target_include_directories(x360port_validation PUBLIC include)
 x360port_enable_warnings(x360port_validation)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_compile_definitions(x360port_validation PUBLIC $<$<CONFIG:Debug>:_GLIBCXX_DEBUG>)
+endif()
 
 set(X360PORT_RUNTIME_SOURCES
     src/device_dispatch.cpp
