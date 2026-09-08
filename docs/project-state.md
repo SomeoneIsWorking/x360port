@@ -31,8 +31,9 @@ through Xenia's x64 dynarec and its typed function and variable imports cross
 Xenia's production export machinery. The device-backed guest-memory callback
 boundary is now proven; executable-write notification and Xenia virtual-memory
 observation now invalidate affected cached functions while preserving unrelated
-entries. The next shared gap is internal guest-call routing and bounded exit
-behavior.
+entries. The runtime test also proves a translated guest caller can route through
+Xenia to a separate guest callee and reuse both translations. The next shared
+gap is bounded exit behavior and mid-call invalidation semantics.
 
 ## Capability details
 
@@ -111,8 +112,9 @@ proves native result wrapping, original-call and invalidation counters, and
 restored dynarec execution.
 
 Gap: this is only the public entry-dispatch contract. A real Gears image must
-exercise the authenticated leaf and prove internal guest call paths, executable
-writes, and title override bindings invalidate all affected Xenia translations.
+exercise the authenticated leaf and prove its internal guest call paths,
+executable writes, and title override bindings invalidate all affected Xenia
+translations.
 
 ### S011 — bounded calls
 
@@ -132,8 +134,8 @@ affected module functions to declared state, and re-translates them from the
 modified guest bytes. The runtime test proves the automatic path with a PPC
 self-modifying leaf, including nonzero observation and the changed return value,
 while preserving unrelated translations. Remaining gap: writes made and then
-executed before the guest returns are not drained mid-call; internal guest-call
-routing must own that boundary before title behavior can rely on it.
+executed before the guest returns are not drained mid-call; title behavior needs
+that stronger invalidation boundary before it can rely on self-modifying code.
 
 ### S013 — x64 JIT execution
 
