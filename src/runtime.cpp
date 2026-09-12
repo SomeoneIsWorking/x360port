@@ -260,12 +260,12 @@ class RuntimeContext::Impl final
             return Failure(RuntimeError::LoadStateInvalid,
                            "native overrides require an authenticated image to be loaded");
         }
-        return overrides_.Install(address, handler, context, code_range_, InvalidateEntry, this);
+        return overrides_.Install(address, handler, context, code_range_);
     }
 
     [[nodiscard]] RuntimeFailure RemoveOverride(GuestAddress address)
     {
-        return overrides_.Remove(address, InvalidateEntry, this);
+        return overrides_.Remove(address);
     }
 
     [[nodiscard]] RuntimeFailure RegisterDeviceMemoryRange(std::uint32_t address,
@@ -369,14 +369,12 @@ class RuntimeContext::Impl final
     [[nodiscard]] const JitStatistics& Statistics() const noexcept { return statistics_; }
     [[nodiscard]] GuestMemory& GuestMemoryOwner() noexcept { return guest_memory_; }
 
-  private:
-    static void InvalidateEntry(void* context, GuestAddress address) noexcept
+    void BindOverrideOwner(RuntimeContext& owner) noexcept
     {
-        auto& runtime = *static_cast<Impl*>(context);
-        runtime.processor_->RemoveFunctionByAddress(address);
-        ++runtime.statistics_.translation_invalidations;
+        overrides_.Bind(*processor_, owner, statistics_);
     }
 
+  private:
     [[nodiscard]] bool IsInCodeRange(GuestAddress address) const noexcept
     {
         return module_ != nullptr && address >= code_range_.base &&
@@ -403,7 +401,10 @@ class RuntimeContext::Impl final
     DeviceDispatch devices_{statistics_};
 };
 
-RuntimeContext::RuntimeContext(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl)) {}
+RuntimeContext::RuntimeContext(std::unique_ptr<Impl> impl) noexcept : impl_(std::move(impl))
+{
+    impl_->BindOverrideOwner(*this);
+}
 
 RuntimeContext::~RuntimeContext() = default;
 

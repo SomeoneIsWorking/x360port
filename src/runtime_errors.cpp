@@ -53,6 +53,8 @@ std::string_view ToString(RuntimeError error) noexcept
         return "native override already installed";
     case RuntimeError::OverrideNotInstalled:
         return "native override not installed";
+    case RuntimeError::OverrideDispatchFailed:
+        return "native override guest-call dispatch failed";
     case RuntimeError::DeviceRangeInvalid:
         return "invalid device-memory range";
     case RuntimeError::DeviceRangeRegistrationFailed:

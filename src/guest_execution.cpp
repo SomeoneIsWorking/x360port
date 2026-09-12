@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "xenia/cpu/function.h"
 #include "xenia/cpu/ppc/ppc_context.h"
@@ -64,7 +65,9 @@ ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
     xe::cpu::ppc::GuestExecutionBudget execution_budget{
         limits.max_guest_blocks, xe::cpu::ppc::GuestExecutionExitReason::kNone, 0};
     GuestImportRefusal import_refusal;
-    const GuestExecutionBudgetScope budget_scope(*context, execution_budget, import_refusal);
+    RuntimeFailure override_failure;
+    const GuestExecutionBudgetScope budget_scope(*context, execution_budget, import_refusal,
+                                                 override_failure);
     const GuestCallFrame call_frame(*context, kReturnAddress);
     const bool executed = function.Call(&thread_state, kReturnAddress);
     if (execution_budget.exit_reason != xe::cpu::ppc::GuestExecutionExitReason::kNone)
@@ -86,6 +89,11 @@ ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
                             std::to_string(import_refusal.ordinal) +
                             " refused: " + std::string(RefusalReasonText(import_refusal.reason))},
                     0};
+        }
+        if (execution_budget.exit_reason ==
+            xe::cpu::ppc::GuestExecutionExitReason::kNativeOverrideFailed)
+        {
+            return {std::move(override_failure), 0};
         }
         if (execution_budget.exit_reason ==
             xe::cpu::ppc::GuestExecutionExitReason::kBlockBudgetExceeded)

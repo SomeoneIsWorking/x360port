@@ -1,10 +1,12 @@
 #ifndef X360PORT_GUEST_EXECUTION_BUDGET_HPP
 #define X360PORT_GUEST_EXECUTION_BUDGET_HPP
 
+#include "x360port/runtime.hpp"
 #include "x360port/validation.hpp"
 
 #include <exception>
 #include <string_view>
+#include <utility>
 
 #include "xenia/cpu/ppc/ppc_context.h"
 
@@ -21,6 +23,21 @@ struct GuestImportRefusal
 };
 
 inline thread_local GuestImportRefusal* active_guest_import_refusal = nullptr;
+inline thread_local RuntimeFailure* active_guest_override_failure = nullptr;
+
+inline void MarkGuestOverrideFailed(RuntimeFailure failure) noexcept
+{
+    if (active_guest_execution_budget == nullptr || active_guest_override_failure == nullptr)
+    {
+        std::terminate();
+    }
+    if (active_guest_execution_budget->exit_reason == xe::cpu::ppc::GuestExecutionExitReason::kNone)
+    {
+        *active_guest_override_failure = std::move(failure);
+        active_guest_execution_budget->exit_reason =
+            xe::cpu::ppc::GuestExecutionExitReason::kNativeOverrideFailed;
+    }
+}
 
 inline void MarkGuestImportRefused(std::string_view library, std::uint32_t ordinal,
                                    ImportRefusalReason reason) noexcept
@@ -52,14 +69,17 @@ class GuestExecutionBudgetScope final
   public:
     GuestExecutionBudgetScope(xe::cpu::ppc::PPCContext& context,
                               xe::cpu::ppc::GuestExecutionBudget& budget,
-                              GuestImportRefusal& refusal) noexcept
+                              GuestImportRefusal& refusal,
+                              RuntimeFailure& override_failure) noexcept
         : context_(context), previous_(context.execution_budget),
-          previous_refusal_(active_guest_import_refusal)
+          previous_refusal_(active_guest_import_refusal),
+          previous_override_failure_(active_guest_override_failure)
     {
         context_.execution_budget = &budget;
         previous_active_ = active_guest_execution_budget;
         active_guest_execution_budget = &budget;
         active_guest_import_refusal = &refusal;
+        active_guest_override_failure = &override_failure;
     }
 
     GuestExecutionBudgetScope(const GuestExecutionBudgetScope&) = delete;
@@ -68,6 +88,7 @@ class GuestExecutionBudgetScope final
     ~GuestExecutionBudgetScope()
     {
         active_guest_import_refusal = previous_refusal_;
+        active_guest_override_failure = previous_override_failure_;
         active_guest_execution_budget = previous_active_;
         context_.execution_budget = previous_;
     }
@@ -77,6 +98,7 @@ class GuestExecutionBudgetScope final
     xe::cpu::ppc::GuestExecutionBudget* previous_;
     xe::cpu::ppc::GuestExecutionBudget* previous_active_ = nullptr;
     GuestImportRefusal* previous_refusal_ = nullptr;
+    RuntimeFailure* previous_override_failure_ = nullptr;
 };
 
 } // namespace x360port
