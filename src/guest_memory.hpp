@@ -29,6 +29,7 @@ class GuestMemory final
     void Reset() noexcept;
 
     [[nodiscard]] GuestMemoryAllocationResult Allocate(std::uint32_t size);
+    [[nodiscard]] RuntimeFailure Read(GuestAddress address, std::span<std::byte> bytes) const;
     [[nodiscard]] RuntimeFailure Write(GuestAddress address,
                                        std::span<const std::byte> bytes) const;
     [[nodiscard]] RuntimeFailure Release(GuestMemoryAllocation allocation);

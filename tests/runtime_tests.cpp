@@ -166,6 +166,15 @@ int main()
     RuntimeFailure guest_write =
         created.context->WriteGuestMemory(guest_allocation.allocation.address + 4U, guest_bytes);
     Require(!guest_write, guest_write.detail);
+    std::array<std::byte, 4> guest_read_bytes{};
+    RuntimeFailure guest_read = created.context->ReadGuestMemory(
+        guest_allocation.allocation.address + 4U, guest_read_bytes);
+    Require(!guest_read && guest_read_bytes == guest_bytes,
+            "guest-memory read did not return the stored bytes");
+    guest_read = created.context->ReadGuestMemory(guest_allocation.allocation.address + 0x1FU,
+                                                  guest_read_bytes);
+    Require(guest_read.error == RuntimeError::GuestMemoryRangeInvalid,
+            "a guest-memory read outside its allocation was accepted");
     guest_write =
         created.context->WriteGuestMemory(guest_allocation.allocation.address + 0x1FU, guest_bytes);
     Require(guest_write.error == RuntimeError::GuestMemoryRangeInvalid,
