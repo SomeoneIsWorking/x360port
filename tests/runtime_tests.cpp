@@ -20,6 +20,7 @@ constexpr GuestAddress kSelfModifyingAddress = kCodeAddress + 48;
 constexpr GuestAddress kInternalCallerAddress = kCodeAddress + 80;
 constexpr GuestAddress kNonReturningAddress = kCodeAddress + 108;
 constexpr GuestAddress kNonReturningCallerAddress = kCodeAddress + 112;
+constexpr GuestAddress kMidCallInvalidationAddress = kCodeAddress + 128;
 constexpr GuestAddress kDeviceReadAddress = kCodeAddress + 8;
 constexpr GuestAddress kDeviceWriteAddress = kCodeAddress + 24;
 constexpr std::uint32_t kDeviceAddress = 0xC0001000;
@@ -29,66 +30,22 @@ constexpr GuestAddress kVariableCallAddress = kImportedCallAddress + 0x30;
 constexpr GuestAddress kVariableRecordAddress = kImportedCallAddress + 0x48;
 constexpr GuestAddress kFunctionRecordAddress = kImportedCallAddress + 0x4C;
 constexpr GuestAddress kVariableValueAddress = kImportedCallAddress + 0x58;
-constexpr std::array<std::uint8_t, 8> kReturnFortyTwo{
-    0x38, 0x60, 0x00, 0x2A, // li r3, 42
-    0x4E, 0x80, 0x00, 0x20, // blr
-};
-
 class TestModule final : public GuestModule
 {
   public:
     TestModule()
     {
-        for (std::size_t index = 0; index < kReturnFortyTwo.size(); ++index)
-        {
-            image_[index] = static_cast<std::byte>(kReturnFortyTwo[index]);
-        }
-        CopyBytes(8, {
-                         0x3C,
-                         0x60,
-                         0xC0,
-                         0x00, // lis r3, 0xc000
-                         0x60,
-                         0x63,
-                         0x10,
-                         0x00, // ori r3, r3, 0x1000
-                         0x80,
-                         0x63,
-                         0x00,
-                         0x00, // lwz r3, 0(r3)
-                         0x4E,
-                         0x80,
-                         0x00,
-                         0x20, // blr
-                     });
-        CopyBytes(24, {
-                          0x3C, 0x60, 0xC0, 0x00, // lis r3, 0xc000
-                          0x60, 0x63, 0x10, 0x00, // ori r3, r3, 0x1000
-                          0x38, 0x80, 0x00, 0x63, // li r4, 99
-                          0x90, 0x83, 0x00, 0x04, // stw r4, 4(r3)
-                          0x38, 0x60, 0x00, 0x07, // li r3, 7
-                          0x4E, 0x80, 0x00, 0x20, // blr
-                      });
-        CopyBytes(48, {
-                          0x3C, 0x60, 0x82, 0x00, // lis r3, 0x8200
-                          0x60, 0x63, 0x00, 0x00, // ori r3, r3, 0
-                          0x3C, 0x80, 0x38, 0x60, // lis r4, 0x3860
-                          0x60, 0x84, 0x00, 0x2B, // ori r4, r4, 43
-                          0x90, 0x83, 0x00, 0x00, // stw r4, 0(r3)
-                          0x38, 0x60, 0x00, 0x09, // li r3, 9
-                          0x4E, 0x80, 0x00, 0x20, // blr
-                      });
-        CopyBytes(80, {
-                          0x7C, 0x08, 0x02, 0xA6, // mflr r0
-                          0x48, 0x00, 0x00, 0x0D, // bl +12, to 0x82000060
-                          0x7C, 0x08, 0x03, 0xA6, // mtlr r0
-                          0x4E, 0x80, 0x00, 0x20, // blr
-                          0x38, 0x60, 0x00, 0x11, // li r3, 17
-                          0x4E, 0x80, 0x00, 0x20, // blr
-                      });
-        CopyBytes(108, {0x48, 0x00, 0x00, 0x00}); // b .
-        CopyBytes(112, {0x48, 0x00, 0x00, 0x09}); // bl +8, to the nested leaf
-        CopyBytes(120, {0x48, 0x00, 0x00, 0x00}); // b .
+        CopyWords(0, {0x3860002A, 0x4E800020}); // li r3, 42; blr
+        CopyWords(8, {0x3C60C000, 0x60631000, 0x80630000, 0x4E800020});
+        CopyWords(24, {0x3C60C000, 0x60631000, 0x38800063, 0x90830004, 0x38600007, 0x4E800020});
+        CopyWords(48, {0x3C608200, 0x60630000, 0x3C803860, 0x6084002B, 0x90830000, 0x38600009,
+                       0x4E800020});
+        CopyWords(80, {0x7C0802A6, 0x4800000D, 0x7C0803A6, 0x4E800020, 0x38600011, 0x4E800020});
+        CopyWords(108, {0x48000000}); // b .
+        CopyWords(112, {0x48000009}); // bl +8, to the nested leaf
+        CopyWords(120, {0x48000000}); // b .
+        CopyWords(128, {0x3C608200, 0x60630098, 0x3C804E80, 0x60840020, 0x90830000, 0x7C6903A6,
+                        0x4E800420});
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -111,17 +68,18 @@ class TestModule final : public GuestModule
     }
 
   private:
-    void CopyBytes(std::size_t offset, std::initializer_list<std::uint8_t> bytes)
+    void CopyWords(std::size_t offset, std::initializer_list<std::uint32_t> words)
     {
-        std::size_t index = 0;
-        for (const std::uint8_t byte : bytes)
+        for (const std::uint32_t word : words)
         {
-            image_[offset + index] = static_cast<std::byte>(byte);
-            ++index;
+            image_[offset++] = static_cast<std::byte>(word >> 24);
+            image_[offset++] = static_cast<std::byte>(word >> 16);
+            image_[offset++] = static_cast<std::byte>(word >> 8);
+            image_[offset++] = static_cast<std::byte>(word);
         }
     }
 
-    std::array<std::byte, 124> image_{};
+    std::array<std::byte, 156> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -351,10 +309,23 @@ int main()
     Require(created.context->Statistics().execution_budget_exhaustions == 2,
             "the nested bounded guest exit was not counted");
 
+    ExecutionResult mid_call_invalidation = created.context->Execute(kMidCallInvalidationAddress);
+    Require(!mid_call_invalidation, "a self-modifying guest call continued after its write");
+    Require(mid_call_invalidation.failure.error == RuntimeError::ExecutionInvalidated,
+            "the mid-call executable write did not report its typed exit reason");
+    Require(created.context->Statistics().execution_invalidations == 1,
+            "the mid-call executable write was not counted");
+    ExecutionResult after_mid_call = created.context->Execute(kCodeAddress);
+    Require(static_cast<bool>(after_mid_call), after_mid_call.failure.detail);
+    Require(created.context->Statistics().translation_invalidations >= 1,
+            "the mid-call executable write was not drained before the next guest call");
+
     ExecutionResult self_modifying = created.context->Execute(kSelfModifyingAddress);
-    Require(static_cast<bool>(self_modifying), self_modifying.failure.detail);
-    Require(self_modifying.value == 9,
-            "the self-modifying guest function returned the wrong value");
+    Require(!self_modifying, "a self-modifying guest call continued after its executable write");
+    Require(self_modifying.failure.error == RuntimeError::ExecutionInvalidated,
+            "the self-modifying guest write did not report its typed exit reason");
+    Require(created.context->Statistics().execution_invalidations == 2,
+            "the self-modifying guest write was not counted");
     Require(created.context->Statistics().observed_executable_writes != 0,
             "Xenia did not observe the guest executable write");
     ExecutionResult automatically_invalidated = created.context->Execute(kCodeAddress);
@@ -425,7 +396,7 @@ int main()
 
     const std::uint64_t translations_before_invalidation =
         recreated.context->Statistics().translated_functions;
-    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 123, 2);
+    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 155, 2);
     Require(loaded.error == RuntimeError::ExecutableRangeInvalid,
             "an executable write outside the authenticated code range was accepted");
     loaded = recreated.context->NotifyExecutableWrite(kDeviceReadAddress, 4);

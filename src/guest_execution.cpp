@@ -50,6 +50,14 @@ ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
     const bool executed = function.Call(&thread_state, kReturnAddress);
     if (execution_budget.exit_reason != xe::cpu::ppc::GuestExecutionExitReason::kNone)
     {
+        if (execution_budget.exit_reason ==
+            xe::cpu::ppc::GuestExecutionExitReason::kExecutableWriteObserved)
+        {
+            return {
+                RuntimeFailure{RuntimeError::ExecutionInvalidated,
+                               "Xenia stopped the guest call after observing an executable write"},
+                0};
+        }
         return {RuntimeFailure{
                     RuntimeError::ExecutionBudgetExceeded,
                     "Xenia stopped the guest call after exhausting its translated-block budget"},
