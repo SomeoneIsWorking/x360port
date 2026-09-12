@@ -113,10 +113,15 @@ the address entry when the override is installed or removed. The runtime test
 proves native result wrapping, original-call and invalidation counters, and
 restored dynarec execution.
 
-Gap: this is only the public entry-dispatch contract. A real Gears image must
-exercise the authenticated leaf and prove its internal guest call paths,
-executable writes, and title override bindings invalidate all affected Xenia
-translations.
+Gap: this is only the public entry-dispatch contract. A focused synthetic
+falsifier installed an override at a guest callee returning 17: direct host
+entry returned the wrapped value 18, but an already-translated guest caller
+still returned 17 and a caller translated after installation did not return
+the wrapped value 18. Internal
+guest calls do not consult the override table. The production fix must route
+direct and indirect translated calls through an image-scoped native entry while
+preserving a separately callable original body, its PPC state, and coherent
+install/remove invalidation. Real Gears-image call paths remain unqualified.
 
 ### S011 — bounded calls
 

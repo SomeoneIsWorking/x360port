@@ -28,7 +28,7 @@ synthetic PPC load and store instructions and checks callback values, addresses,
 and counters. `RuntimeContext::NotifyExecutableWrite` now also validates a
 title-reported PPC write range, removes affected cached Xenia functions, and
 proves an unrelated function remains cached. Automatic write observation,
-bounded exits, internal guest-call routing, and mid-call invalidation are now
+bounded exits, ordinary internal guest calls, and mid-call invalidation are now
 proven in the synthetic runtime. Function imports now also expose register
 arguments, return propagation, and bounded guest-memory access through the
 title-neutral `GuestImportContext` while retaining Xenia's private trampoline
@@ -38,6 +38,27 @@ drains the pending range before dispatch. Reason-labelled interpreter fallback
 and real-image invalidation paths remain open. The checked XEX inspector now
 resolves the XEX import-library string table by library index and alignment,
 preserving the real image's `xam.xex` and `xboxkrnl.exe` bindings.
+
+## Native override falsifier — 2026-09-12
+
+A temporary discriminator in `tests/runtime_tests.cpp` installed the native
+`AddOneThroughOriginal` handler on the existing synthetic internal callee at
+`kCodeAddress + 96`. Direct `RuntimeContext::Execute` returned 18 from the
+original value 17, proving the handler and scoped original were live. The
+already-translated guest caller returned 17; a caller first translated after
+installation also failed to return the wrapped value 18. The latter failed
+with `a newly translated guest caller did not use the native override`.
+The probe was removed after measurement; the shipping test suite remains green
+but does not prove internal override dispatch.
+
+`RuntimeContext::Execute` alone checks `OverrideDispatch::Find`; Xenia's direct
+and indirect translated calls use its own `GuestFunction` machine-code and
+code-cache paths. Invalidating only the callee entry cannot redirect those
+calls. The correction belongs at Xenia's guest-call/translation boundary,
+with an image-scoped native entry, full PPC/guest-memory ABI, a separately
+callable original body, and coherent install/remove behavior for already
+translated direct and indirect callers. A host-entry-only wrapper is not a
+native game override.
 
 ## Resolution condition
 
