@@ -39,6 +39,7 @@ enum class RuntimeError : std::uint8_t
     OverrideInvalid,
     OverrideAlreadyInstalled,
     OverrideNotInstalled,
+    OverrideDispatchFailed,
     DeviceRangeInvalid,
     DeviceRangeRegistrationFailed,
     ExecutableRangeInvalid,

@@ -28,11 +28,10 @@ static or interpreter product path.
 ## Current focus
 
 S010 is the current focus. Xenia now routes compiled guest calls through
-invalidatable guest-address entries, including a caller cached before a callee's
-executable write. The remaining native-override work is to redirect those
-entries to title-owned handlers and preserve scoped original calls. Broader
-real-image service composition, gameplay, and reason-labelled fallback remain
-open.
+invalidatable guest-address entries and can redirect a cached caller to a
+title-owned native handler while preserving a separately callable original.
+The synthetic contract is verified on x64; real Gears-image override paths,
+broader service composition, gameplay, and reason-labelled fallback remain open.
 
 ## Capability details
 
@@ -106,22 +105,18 @@ remain owned by the runtime context rather than by title or engine policy.
 
 ### S010 — overrides and original calls
 
-Evidence: `RuntimeContext::InstallOverride` and `CallOriginal` dispatch a
-validated guest entry through a title-owned native handler, let that handler
-re-enter the same guest address through Xenia without recursion, and invalidate
-the address entry when the override is installed or removed. The runtime test
-proves native result wrapping, original-call and invalidation counters, and
-restored dynarec execution.
+Evidence: `RuntimeContext::InstallOverride` binds a validated guest address to
+Xenia's guest-call indirection slot. Host entry and an already-translated guest
+caller both return the wrapped value 18 from a native handler around a guest
+callee returning 17. `CallOriginal` re-enters the translated body without
+recursion; callee invalidation retains the redirect, a failing native callback
+exits with its typed failure, and removal restores the cached caller's original
+result. The x64 synthetic runtime gate and Clang-Tidy pass at Xenia
+`7730acfce1801bbe340c0ccd79d24c7252a22a98`.
 
-Gap: this is only the public entry-dispatch contract. A focused synthetic
-falsifier installed an override at a guest callee returning 17: direct host
-entry returned the wrapped value 18, but an already-translated guest caller
-still returned 17 and a caller translated after installation did not return
-the wrapped value 18. Internal guest calls do not consult the override table.
-The production fix must redirect Xenia's direct and indirect call entries to an
-image-scoped native target while
-preserving a separately callable original body, its PPC state, and coherent
-install/remove invalidation. Real Gears-image call paths remain unqualified.
+Gap: real Gears-image native override entry, original-call, and removal paths
+remain unqualified. The current test exercises a cached direct guest call; an
+indirect guest call and A64 backend still need their own runtime discriminators.
 
 ### S011 — bounded calls
 

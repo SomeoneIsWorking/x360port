@@ -119,6 +119,12 @@ ExecutionResult AddOneThroughOriginal(RuntimeContext& runtime, GuestAddress addr
     return original;
 }
 
+ExecutionResult RefuseOverride(RuntimeContext&, GuestAddress, std::span<const std::uint64_t>,
+                               void*) noexcept
+{
+    return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};
+}
+
 [[noreturn]] void Fail(std::string_view message)
 {
     std::cerr << "runtime contract test failed: " << message << '\n';
@@ -195,6 +201,38 @@ int main()
     Require(internal_call.value == 17, "the cached internal guest call returned the wrong value");
     Require(created.context->Statistics().translated_functions == translations_after_internal_call,
             "the cached internal guest call translated again");
+
+    OverrideObservations nested_override;
+    loaded = created.context->InstallOverride(kCodeAddress + 96U, AddOneThroughOriginal,
+                                              &nested_override);
+    Require(!loaded, loaded.detail);
+    ExecutionResult direct_override = created.context->Execute(kCodeAddress + 96U);
+    Require(static_cast<bool>(direct_override) && direct_override.value == 18,
+            "the host-entered native override did not call its original");
+    ExecutionResult guest_override = created.context->Execute(kInternalCallerAddress);
+    Require(static_cast<bool>(guest_override) && guest_override.value == 18,
+            "the cached guest caller did not invoke the native override");
+    Require(nested_override.calls == 2, "the direct and guest calls did not invoke one override");
+    loaded = created.context->NotifyExecutableWrite(kCodeAddress + 96U, 4);
+    Require(!loaded, loaded.detail);
+    guest_override = created.context->Execute(kInternalCallerAddress);
+    Require(static_cast<bool>(guest_override) && guest_override.value == 18,
+            "callee invalidation lost the active guest-call redirect");
+    Require(nested_override.calls == 3,
+            "the invalidated callee did not enter the active native override");
+    loaded = created.context->RemoveOverride(kCodeAddress + 96U);
+    Require(!loaded, loaded.detail);
+    loaded = created.context->InstallOverride(kCodeAddress + 96U, RefuseOverride);
+    Require(!loaded, loaded.detail);
+    ExecutionResult guest_refusal = created.context->Execute(kInternalCallerAddress);
+    Require(!guest_refusal && guest_refusal.failure.error == RuntimeError::ExecutionFailed &&
+                guest_refusal.failure.detail == "native test refusal",
+            "a guest-entered native override did not preserve its typed failure");
+    loaded = created.context->RemoveOverride(kCodeAddress + 96U);
+    Require(!loaded, loaded.detail);
+    ExecutionResult guest_after_removal = created.context->Execute(kInternalCallerAddress);
+    Require(static_cast<bool>(guest_after_removal) && guest_after_removal.value == 17,
+            "removing the override did not restore the cached guest caller");
 
     ExecutionResult invalidated_caller = created.context->Execute(kInvalidatedCallerAddress);
     Require(static_cast<bool>(invalidated_caller) && invalidated_caller.value == 42,
@@ -273,16 +311,16 @@ int main()
             "the native override dispatch was not counted");
     Require(recreated.context->Statistics().original_calls == 1,
             "the scoped original call was not counted");
-    Require(recreated.context->Statistics().translation_invalidations == 1,
-            "installing the native override did not invalidate the guest entry");
+    Require(recreated.context->Statistics().translation_invalidations == 0,
+            "installing an override unnecessarily retranslated the original");
 
     loaded = recreated.context->RemoveOverride(kCodeAddress);
     Require(!loaded, loaded.detail);
     ExecutionResult restored = recreated.context->Execute(kCodeAddress);
     Require(static_cast<bool>(restored), restored.failure.detail);
     Require(restored.value == 42, "removing the native override did not restore guest execution");
-    Require(recreated.context->Statistics().translation_invalidations == 2,
-            "removing the native override did not invalidate the guest entry");
+    Require(recreated.context->Statistics().translation_invalidations == 0,
+            "removing an override unnecessarily retranslated the original");
 
     DeviceObservations device_observations;
     loaded = recreated.context->RegisterDeviceMemoryRange(
