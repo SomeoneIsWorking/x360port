@@ -32,9 +32,13 @@ class GuestMemory final
     [[nodiscard]] RuntimeFailure Read(GuestAddress address, std::span<std::byte> bytes) const;
     [[nodiscard]] RuntimeFailure Write(GuestAddress address,
                                        std::span<const std::byte> bytes) const;
+    [[nodiscard]] RuntimeFailure ReadMapped(GuestAddress address, std::span<std::byte> bytes) const;
+    [[nodiscard]] RuntimeFailure WriteMapped(GuestAddress address,
+                                             std::span<const std::byte> bytes) const;
     [[nodiscard]] RuntimeFailure Release(GuestMemoryAllocation allocation);
 
   private:
+    [[nodiscard]] bool CanAccess(GuestAddress address, std::size_t size, bool write) const noexcept;
     [[nodiscard]] bool Contains(GuestAddress address, std::size_t size) const noexcept;
 
     xe::Memory* memory_ = nullptr;

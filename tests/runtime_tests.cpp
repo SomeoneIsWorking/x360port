@@ -171,6 +171,15 @@ int main()
         guest_allocation.allocation.address + 4U, guest_read_bytes);
     Require(!guest_read && guest_read_bytes == guest_bytes,
             "guest-memory read did not return the stored bytes");
+    const std::array<std::byte, 4> mapped_write_bytes{std::byte{0xA1}, std::byte{0xB2},
+                                                      std::byte{0xC3}, std::byte{0xD4}};
+    const RuntimeFailure mapped_write = created.context->WriteMappedGuestMemory(
+        guest_allocation.allocation.address + 8U, mapped_write_bytes);
+    Require(!mapped_write, mapped_write.detail);
+    guest_read = created.context->ReadGuestMemory(guest_allocation.allocation.address + 8U,
+                                                  guest_read_bytes);
+    Require(!guest_read && guest_read_bytes == mapped_write_bytes,
+            "mapped guest-memory write did not update the live allocation");
     guest_read = created.context->ReadGuestMemory(guest_allocation.allocation.address + 0x1FU,
                                                   guest_read_bytes);
     Require(guest_read.error == RuntimeError::GuestMemoryRangeInvalid,
@@ -186,6 +195,15 @@ int main()
     RuntimeFailure loaded = created.context->LoadModule(module, {});
     Require(!loaded, loaded.detail);
 
+    std::array<std::byte, 4> mapped_code{};
+    RuntimeFailure mapped_read = created.context->ReadMappedGuestMemory(kCodeAddress, mapped_code);
+    Require(!mapped_read && mapped_code[0] == std::byte{0x38} &&
+                mapped_code[1] == std::byte{0x60} && mapped_code[2] == std::byte{0x00} &&
+                mapped_code[3] == std::byte{0x2A},
+            "mapped guest-memory read did not reach the authenticated image");
+    mapped_read = created.context->ReadMappedGuestMemory(kCodeAddress + 0x10000U, mapped_code);
+    Require(mapped_read.error == RuntimeError::GuestMemoryRangeInvalid,
+            "mapped guest-memory read accepted an uncommitted range");
     ExecutionResult first = created.context->Execute(kCodeAddress);
     Require(static_cast<bool>(first), first.failure.detail);
     Require(first.value == 42, "the translated PPC leaf returned the wrong value");
@@ -432,6 +450,11 @@ int main()
     loaded = recreated.context->RegisterDeviceMemoryRange(
         kDeviceAddress, 0xFFFFF000, 0x1000, DeviceRead, DeviceWrite, &device_observations);
     Require(!loaded, loaded.detail);
+    std::array<std::byte, 4> mapped_device{};
+    const RuntimeFailure mapped_device_read =
+        recreated.context->ReadMappedGuestMemory(kDeviceAddress, mapped_device);
+    Require(mapped_device_read.error == RuntimeError::GuestMemoryRangeInvalid,
+            "mapped guest-memory access accepted a device range");
     ExecutionResult device_read = recreated.context->Execute(kDeviceReadAddress);
     Require(static_cast<bool>(device_read), device_read.failure.detail);
     Require(device_read.value == 0x12345678U, "the device read returned the wrong value");

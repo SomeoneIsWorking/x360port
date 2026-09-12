@@ -80,6 +80,29 @@ RuntimeFailure GuestMemory::Write(GuestAddress address, std::span<const std::byt
     return {};
 }
 
+RuntimeFailure GuestMemory::ReadMapped(GuestAddress address, std::span<std::byte> bytes) const
+{
+    if (!CanAccess(address, bytes.size(), false))
+    {
+        return Failure(RuntimeError::GuestMemoryRangeInvalid,
+                       "mapped guest-memory read must stay inside one readable guest range");
+    }
+    std::memcpy(bytes.data(), memory_->TranslateVirtual(address), bytes.size());
+    return {};
+}
+
+RuntimeFailure GuestMemory::WriteMapped(GuestAddress address,
+                                        std::span<const std::byte> bytes) const
+{
+    if (!CanAccess(address, bytes.size(), true))
+    {
+        return Failure(RuntimeError::GuestMemoryRangeInvalid,
+                       "mapped guest-memory write must stay inside one writable guest range");
+    }
+    std::memcpy(memory_->TranslateVirtual(address), bytes.data(), bytes.size());
+    return {};
+}
+
 RuntimeFailure GuestMemory::Release(GuestMemoryAllocation allocation)
 {
     if (memory_ == nullptr || allocation.address == 0U || allocation.size == 0U)
@@ -113,6 +136,42 @@ bool GuestMemory::Contains(GuestAddress address, std::size_t size) const noexcep
     const std::uint64_t begin = allocation->first;
     const std::uint64_t end = begin + allocation->second;
     return address >= begin && static_cast<std::uint64_t>(address) + size <= end;
+}
+
+bool GuestMemory::CanAccess(GuestAddress address, std::size_t size, bool write) const noexcept
+{
+    if (memory_ == nullptr || size == 0U || size > std::numeric_limits<std::uint32_t>::max())
+    {
+        return false;
+    }
+    const std::uint64_t last_address = static_cast<std::uint64_t>(address) + size - 1U;
+    if (last_address > std::numeric_limits<std::uint32_t>::max())
+    {
+        return false;
+    }
+    auto* first_heap = memory_->LookupHeap(address);
+    auto* last_heap = memory_->LookupHeap(static_cast<GuestAddress>(last_address));
+    if (first_heap == nullptr || first_heap != last_heap)
+    {
+        return false;
+    }
+    const auto access =
+        first_heap->QueryRangeAccess(address, static_cast<GuestAddress>(last_address));
+    const auto access_bits = static_cast<std::uint32_t>(access);
+    const std::uint32_t required = write ? 0x2U : 0x1U;
+    if ((access_bits & required) != required)
+    {
+        return false;
+    }
+    for (std::size_t offset = 0; offset < size; ++offset)
+    {
+        if (memory_->LookupVirtualMappedRange(address + static_cast<GuestAddress>(offset)) !=
+            nullptr)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace x360port
