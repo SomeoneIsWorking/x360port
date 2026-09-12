@@ -147,6 +147,14 @@ class RuntimeContext final
                                                  std::span<std::byte> bytes) const;
     [[nodiscard]] RuntimeFailure WriteGuestMemory(GuestAddress address,
                                                   std::span<const std::byte> bytes);
+    // Reads and writes title-owned mapped memory. Unlike the allocation API,
+    // these operations do not require x360port to own the allocation, but
+    // they still require one committed, accessible guest range and reject
+    // device mappings.
+    [[nodiscard]] RuntimeFailure ReadMappedGuestMemory(GuestAddress address,
+                                                       std::span<std::byte> bytes) const;
+    [[nodiscard]] RuntimeFailure WriteMappedGuestMemory(GuestAddress address,
+                                                        std::span<const std::byte> bytes);
     [[nodiscard]] RuntimeFailure ReleaseGuestMemory(GuestMemoryAllocation allocation);
 
     [[nodiscard]] RuntimeFailure LoadModule(const GuestModule& module,

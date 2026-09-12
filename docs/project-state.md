@@ -57,6 +57,9 @@ Evidence: `RuntimeContext` owns Xenia `Memory`, `Processor`, `ThreadState`, and
 the registered `RawModule`, enforces the process-global fixed mapping as one
 active instance, and releases stack/image mappings after their Xenia owners.
 The teardown/recreation test reloads and executes from the same guest range.
+The title-owned mapped-memory seam validates a committed same-heap range before
+copying bytes and refuses uncommitted and device-mapped ranges; the runtime
+test exercises both classes.
 
 ### S004 — Xenia-backed validation
 
