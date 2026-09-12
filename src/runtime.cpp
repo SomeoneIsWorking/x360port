@@ -425,6 +425,12 @@ GuestMemoryAllocationResult RuntimeContext::AllocateGuestMemory(std::uint32_t si
     return impl_->GuestMemoryOwner().Allocate(size);
 }
 
+RuntimeFailure RuntimeContext::ReadGuestMemory(GuestAddress address,
+                                               std::span<std::byte> bytes) const
+{
+    return impl_->GuestMemoryOwner().Read(address, bytes);
+}
+
 RuntimeFailure RuntimeContext::WriteGuestMemory(GuestAddress address,
                                                 std::span<const std::byte> bytes)
 {

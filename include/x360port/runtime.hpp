@@ -143,6 +143,8 @@ class RuntimeContext final
     [[nodiscard]] static RuntimeCreateResult Create();
 
     [[nodiscard]] GuestMemoryAllocationResult AllocateGuestMemory(std::uint32_t size);
+    [[nodiscard]] RuntimeFailure ReadGuestMemory(GuestAddress address,
+                                                 std::span<std::byte> bytes) const;
     [[nodiscard]] RuntimeFailure WriteGuestMemory(GuestAddress address,
                                                   std::span<const std::byte> bytes);
     [[nodiscard]] RuntimeFailure ReleaseGuestMemory(GuestMemoryAllocation allocation);

@@ -58,6 +58,17 @@ GuestMemoryAllocationResult GuestMemory::Allocate(std::uint32_t size)
     return {GuestMemoryAllocation{address, size}, {}};
 }
 
+RuntimeFailure GuestMemory::Read(GuestAddress address, std::span<std::byte> bytes) const
+{
+    if (memory_ == nullptr || bytes.empty() || !Contains(address, bytes.size()))
+    {
+        return Failure(RuntimeError::GuestMemoryRangeInvalid,
+                       "guest-memory read must stay inside one live allocation");
+    }
+    std::memcpy(bytes.data(), memory_->TranslateVirtual(address), bytes.size());
+    return {};
+}
+
 RuntimeFailure GuestMemory::Write(GuestAddress address, std::span<const std::byte> bytes) const
 {
     if (memory_ == nullptr || bytes.empty() || !Contains(address, bytes.size()))
