@@ -37,6 +37,10 @@ std::string_view ToString(RuntimeError error) noexcept
         return "entry outside code";
     case RuntimeError::TranslationFailed:
         return "translation failed";
+    case RuntimeError::ExecutionBudgetInvalid:
+        return "invalid guest execution block budget";
+    case RuntimeError::ExecutionBudgetExceeded:
+        return "guest execution block budget exceeded";
     case RuntimeError::ExecutionFailed:
         return "execution failed";
     case RuntimeError::OverrideInvalid:

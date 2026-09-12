@@ -31,6 +31,8 @@ enum class RuntimeError : std::uint8_t
     ModuleRegistrationFailed,
     EntryOutsideCode,
     TranslationFailed,
+    ExecutionBudgetInvalid,
+    ExecutionBudgetExceeded,
     ExecutionFailed,
     OverrideInvalid,
     OverrideAlreadyInstalled,
@@ -94,12 +96,21 @@ struct JitStatistics
     std::uint64_t translated_functions = 0;
     std::uint64_t emitted_host_bytes = 0;
     std::uint64_t execution_calls = 0;
+    std::uint64_t execution_budget_exhaustions = 0;
     std::uint64_t native_override_calls = 0;
     std::uint64_t original_calls = 0;
     std::uint64_t translation_invalidations = 0;
     std::uint64_t observed_executable_writes = 0;
     std::uint64_t device_read_calls = 0;
     std::uint64_t device_write_calls = 0;
+};
+
+struct ExecutionLimits
+{
+    // Counts translated guest basic-block entries across nested guest calls.
+    // A zero limit is invalid; the default is intentionally finite so a guest
+    // path that never returns cannot strand the embedding thread.
+    std::uint64_t max_guest_blocks = 1'000'000;
 };
 
 struct RuntimeCreateResult;
@@ -135,9 +146,11 @@ class RuntimeContext final
                                                            void* context = nullptr);
     [[nodiscard]] RuntimeFailure NotifyExecutableWrite(GuestAddress address, std::uint32_t size);
     [[nodiscard]] ExecutionResult Execute(GuestAddress address,
-                                          std::span<const std::uint64_t> arguments = {});
+                                          std::span<const std::uint64_t> arguments = {},
+                                          ExecutionLimits limits = {});
     [[nodiscard]] ExecutionResult CallOriginal(GuestAddress address,
-                                               std::span<const std::uint64_t> arguments = {});
+                                               std::span<const std::uint64_t> arguments = {},
+                                               ExecutionLimits limits = {});
 
     [[nodiscard]] const JitStatistics& Statistics() const noexcept;
 
