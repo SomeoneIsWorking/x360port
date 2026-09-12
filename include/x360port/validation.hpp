@@ -24,13 +24,18 @@ class GuestImportContext final
         return index < arguments_.size() ? arguments_[index] : 0;
     }
 
+    [[nodiscard]] bool read_memory(GuestAddress address,
+                                   std::span<std::byte> destination) const noexcept;
+    [[nodiscard]] bool write_memory(GuestAddress address,
+                                    std::span<const std::byte> source) const noexcept;
     void set_return_value(std::uint64_t value) noexcept { return_value_ = value; }
 
   private:
     friend class RuntimeImports;
 
-    explicit GuestImportContext(const std::array<std::uint64_t, argument_count>& arguments) noexcept
-        : arguments_(arguments), return_value_(arguments[0])
+    explicit GuestImportContext(const std::array<std::uint64_t, argument_count>& arguments,
+                                void* memory) noexcept
+        : arguments_(arguments), return_value_(arguments[0]), memory_(memory)
     {
     }
 
@@ -38,6 +43,7 @@ class GuestImportContext final
 
     std::array<std::uint64_t, argument_count> arguments_{};
     std::uint64_t return_value_ = 0;
+    void* memory_ = nullptr;
 };
 
 using ImportFunctionHandler = void (*)(GuestImportContext& context,

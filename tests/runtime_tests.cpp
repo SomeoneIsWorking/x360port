@@ -87,6 +87,9 @@ struct ImportObservations
 {
     std::uint32_t function_calls = 0;
     std::uint64_t last_function_argument = 0;
+    GuestAddress scratch_address = 0;
+    bool memory_round_trip = false;
+    bool invalid_memory_refused = false;
     std::uint32_t variable_resolutions = 0;
 };
 
@@ -135,6 +138,15 @@ void FunctionImport(GuestImportContext& call, void* context) noexcept
     auto& observations = *static_cast<ImportObservations*>(context);
     ++observations.function_calls;
     observations.last_function_argument = call.argument(0);
+    const std::array<std::byte, 4> expected{std::byte{0x12}, std::byte{0x34}, std::byte{0x56},
+                                            std::byte{0x78}};
+    observations.memory_round_trip = call.write_memory(observations.scratch_address, expected);
+    std::array<std::byte, 4> actual{};
+    observations.memory_round_trip = observations.memory_round_trip &&
+                                     call.read_memory(observations.scratch_address, actual) &&
+                                     actual == expected;
+    std::array<std::byte, 1> invalid_read{};
+    observations.invalid_memory_refused = !call.read_memory(UINT32_MAX, invalid_read);
     call.set_return_value(call.argument(0));
 }
 
@@ -424,6 +436,9 @@ int main()
     RuntimeCreateResult imported = RuntimeContext::Create();
     Require(static_cast<bool>(imported), imported.failure.detail);
     ImportObservations observations;
+    GuestMemoryAllocationResult import_scratch = imported.context->AllocateGuestMemory(4);
+    Require(static_cast<bool>(import_scratch), import_scratch.failure.detail);
+    observations.scratch_address = import_scratch.allocation.address;
     {
         ImportedTestModule imported_module;
         std::array<ImportBinding, 2> bindings{
@@ -456,6 +471,10 @@ int main()
             "guest PPC did not call the bound host function import with its context");
     Require(observations.last_function_argument == 7,
             "the typed function import context did not expose the guest argument");
+    Require(observations.memory_round_trip,
+            "the typed function import context did not safely round-trip guest memory");
+    Require(observations.invalid_memory_refused,
+            "the typed function import context accepted an unmapped guest address");
 
     ExecutionResult variable_call = imported.context->Execute(kVariableCallAddress);
     Require(static_cast<bool>(variable_call), variable_call.failure.detail);

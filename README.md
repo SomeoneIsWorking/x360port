@@ -19,7 +19,9 @@ runtime test executes a real PPC leaf plus guest calls and loads through both
 import kinds, and requires nonzero emitted host code. Function imports expose
 the eight Xenon register arguments and a return-value setter through the
 title-neutral `GuestImportContext`; the Xenia kernel trampoline remains private
-to this adapter.
+to this adapter. The same context provides bounded guest-memory reads and
+writes for service handlers, rejecting unmapped or cross-heap ranges before
+translation.
 
 It has no interpreter, generated-code, or fallback executor. x86-64 Linux is
 locally verified. CI executes the same synthetic runtime contract on Linux

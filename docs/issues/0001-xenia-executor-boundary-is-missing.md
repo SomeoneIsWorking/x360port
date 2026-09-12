@@ -30,8 +30,9 @@ title-reported PPC write range, removes affected cached Xenia functions, and
 proves an unrelated function remains cached. Automatic write observation,
 bounded exits, internal guest-call routing, and mid-call invalidation are now
 proven in the synthetic runtime. Function imports now also expose register
-arguments and return propagation through the title-neutral `GuestImportContext`
-while retaining Xenia's private trampoline ABI. The active call exits with
+arguments, return propagation, and bounded guest-memory access through the
+title-neutral `GuestImportContext` while retaining Xenia's private trampoline
+ABI. The active call exits with
 `ExecutionInvalidated` after the watched guest store, and the next guest entry
 drains the pending range before dispatch. Reason-labelled interpreter fallback
 and real-image invalidation paths remain open.
