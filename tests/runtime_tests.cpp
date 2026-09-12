@@ -24,6 +24,8 @@ constexpr GuestAddress kNonReturningCallerAddress = kCodeAddress + 112;
 constexpr GuestAddress kMidCallInvalidationAddress = kCodeAddress + 128;
 constexpr GuestAddress kDeviceReadAddress = kCodeAddress + 8;
 constexpr GuestAddress kDeviceWriteAddress = kCodeAddress + 24;
+constexpr GuestAddress kInvalidOpcodeAddress = kCodeAddress + 176;
+constexpr GuestAddress kUnimplementedOpcodeAddress = kCodeAddress + 184;
 constexpr std::uint32_t kDeviceAddress = 0xC0001000;
 class TestModule final : public GuestModule
 {
@@ -42,6 +44,8 @@ class TestModule final : public GuestModule
         CopyWords(128, {0x3C608200, 0x60630098, 0x3C804E80, 0x60840020, 0x90830000, 0x7C6903A6,
                         0x4E800420});
         CopyWords(160, {0x7C0802A6, 0x4BFFFF5D, 0x7C0803A6, 0x4E800020});
+        CopyWords(176, {0x00000001, 0x4E800020}); // primary opcode zero is invalid
+        CopyWords(184, {0x7C0004AA, 0x4E800020}); // lswi is decoded but has no implementation
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -75,7 +79,7 @@ class TestModule final : public GuestModule
         }
     }
 
-    std::array<std::byte, 176> image_{};
+    std::array<std::byte, 192> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -186,6 +190,31 @@ int main()
             "the cache hit was incorrectly reported as another translation");
     Require(created.context->Statistics().execution_calls == 2,
             "the cache-hit call was not counted");
+
+    const JitStatistics before_invalid_opcode = created.context->Statistics();
+    const ExecutionResult invalid_opcode = created.context->Execute(kInvalidOpcodeAddress);
+    Require(!invalid_opcode, "an invalid PPC opcode was silently translated");
+    Require(invalid_opcode.failure.error == RuntimeError::TranslationFailed,
+            invalid_opcode.failure.detail);
+    Require(created.context->Statistics().translated_functions ==
+                    before_invalid_opcode.translated_functions &&
+                created.context->Statistics().emitted_host_bytes ==
+                    before_invalid_opcode.emitted_host_bytes &&
+                created.context->Statistics().execution_calls ==
+                    before_invalid_opcode.execution_calls,
+            "an invalid PPC opcode published or executed host code");
+    const ExecutionResult unimplemented_opcode =
+        created.context->Execute(kUnimplementedOpcodeAddress);
+    Require(!unimplemented_opcode &&
+                unimplemented_opcode.failure.error == RuntimeError::TranslationFailed,
+            "an unimplemented PPC opcode was silently translated or given an unrelated refusal");
+    Require(created.context->Statistics().translated_functions ==
+                    before_invalid_opcode.translated_functions &&
+                created.context->Statistics().emitted_host_bytes ==
+                    before_invalid_opcode.emitted_host_bytes &&
+                created.context->Statistics().execution_calls ==
+                    before_invalid_opcode.execution_calls,
+            "an unimplemented PPC opcode published or executed host code");
 
     const std::uint64_t translations_before_internal_call =
         created.context->Statistics().translated_functions;
