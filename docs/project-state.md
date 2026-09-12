@@ -23,16 +23,16 @@ static or interpreter product path.
 | S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
 | S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
 | S015 | Checked XEX2 inspection and canonical normalized-image output | verified | S001, S002, S003, S004 | G001, G002 |
-| S016 | XAM controller-state import uses a title-supplied snapshot | verified | S008, S011 | G001 |
+| S016 | XAM controller state/capabilities imports use title-supplied device data | verified | S008, S011 | G001 |
 
 ## Current focus
 
-S016 is the current focus. The real `x360port` target now binds the platform
-XAM controller-state export through Xenia's typed import path and consumes a
-title-supplied snapshot. Its synthetic production-boundary test covers guest
-bytes, connection status, null queries, and refusal of invalid guest memory.
-The first real-image consumer and broader service composition remain to be
-qualified; title-specific gameplay and reason-labelled fallback are still open.
+S016 is the current focus. The real `x360port` target binds the platform XAM
+controller state and capabilities exports through Xenia's typed import path and
+consumes title-supplied device data. Its synthetic production-boundary test
+covers exact guest bytes, connection status, null-pointer behavior, and refusal
+of invalid guest memory. Broader real-image service composition, gameplay, and
+reason-labelled fallback remain open.
 
 ## Capability details
 
@@ -135,7 +135,10 @@ test owns this discriminator. The Xenia x64/A64 post-call guard propagates the
 new exit reason without a separate dispatch path.
 
 Gap: cancellation at a safe guest-defined boundary and complete reason-labelled
-interpreter fallback are separate runtime contracts.
+interpreter fallback are separate runtime contracts. The pinned Xenia tree has
+no CPU interpreter implementation to reuse (its interpreter files are GPU-shader
+code); the fallback needs an explicitly owned implementation inside Xenia before
+the embedding layer can select or account for it.
 
 ### S012 — executable invalidation
 
@@ -238,7 +241,7 @@ Gap: the inspector is a shared loading contract, not yet the complete Gears
 title adapter; authenticated image binding, runtime services, and the real leaf
 round-trip remain in S005.
 
-### S016 — XAM controller-state service
+### S016 — XAM controller state/capabilities services
 
 Evidence: `x360port_import_runtime_tests` calls the bound `xam.xex` ordinal 401
 through Xenia's real import thunk. A supplied connected snapshot writes all 16
@@ -246,4 +249,7 @@ big-endian state bytes into checked guest memory; a disconnected snapshot
 clears the previous state and returns the device-not-connected status. A null
 state pointer queries connection, while an unmapped pointer stops translated
 execution with the typed import refusal and library/ordinal context. The
-consumer owns controller-source arbitration and user-slot policy.
+The same production-boundary test calls ordinal 400 and verifies the 20-byte
+type/subtype/flags, supported gamepad, and vibration record, disconnected zeroing,
+null-pointer bad-arguments result, and typed refusal of invalid guest memory.
+The consumer owns controller-source arbitration, capability policy, and user slots.
