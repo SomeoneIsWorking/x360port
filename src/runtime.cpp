@@ -355,6 +355,10 @@ class RuntimeContext::Impl final
         {
             ++statistics_.execution_invalidations;
         }
+        if (result.failure.error == RuntimeError::ImportServiceRefused)
+        {
+            ++statistics_.import_service_refusals;
+        }
         if (result)
         {
             ++statistics_.execution_calls;

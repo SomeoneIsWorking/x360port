@@ -34,6 +34,7 @@ enum class RuntimeError : std::uint8_t
     ExecutionBudgetInvalid,
     ExecutionBudgetExceeded,
     ExecutionInvalidated,
+    ImportServiceRefused,
     ExecutionFailed,
     OverrideInvalid,
     OverrideAlreadyInstalled,
@@ -99,6 +100,7 @@ struct JitStatistics
     std::uint64_t execution_calls = 0;
     std::uint64_t execution_budget_exhaustions = 0;
     std::uint64_t execution_invalidations = 0;
+    std::uint64_t import_service_refusals = 0;
     std::uint64_t native_override_calls = 0;
     std::uint64_t original_calls = 0;
     std::uint64_t translation_invalidations = 0;

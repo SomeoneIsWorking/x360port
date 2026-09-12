@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -13,6 +14,14 @@ namespace x360port
 {
 
 class RuntimeImports;
+
+enum class ImportRefusalReason : std::uint8_t
+{
+    UnsupportedService,
+    InvalidGuestMemory,
+    InvalidArguments,
+    HostUnavailable,
+};
 
 class GuestImportContext final
 {
@@ -29,6 +38,8 @@ class GuestImportContext final
     [[nodiscard]] bool write_memory(GuestAddress address,
                                     std::span<const std::byte> source) const noexcept;
     void set_return_value(std::uint64_t value) noexcept { return_value_ = value; }
+    // Refusal stops the active translated guest call; no return value is committed.
+    void refuse(ImportRefusalReason reason) noexcept { refusal_ = reason; }
 
   private:
     friend class RuntimeImports;
@@ -40,10 +51,12 @@ class GuestImportContext final
     }
 
     [[nodiscard]] std::uint64_t return_value() const noexcept { return return_value_; }
+    [[nodiscard]] std::optional<ImportRefusalReason> refusal() const noexcept { return refusal_; }
 
     std::array<std::uint64_t, argument_count> arguments_{};
     std::uint64_t return_value_ = 0;
     void* memory_ = nullptr;
+    std::optional<ImportRefusalReason> refusal_;
 };
 
 using ImportFunctionHandler = void (*)(GuestImportContext& context,

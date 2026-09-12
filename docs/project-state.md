@@ -88,11 +88,12 @@ gameplay.
 
 ### S008 — typed runtime imports
 
-Evidence: `x360port_runtime_tests` loads an authenticated synthetic module whose
+Evidence: `x360port_import_runtime_tests` loads an authenticated synthetic module whose
 guest PPC calls a function import and loads a variable import. The function
 crosses Xenia's real syscall thunk and typed export callback, whose
 `GuestImportContext` exposes the eight register arguments, return-value
-propagation, and bounded guest-memory read/write access; the variable is
+propagation, bounded guest-memory read/write access, and typed refusal of a
+host service; the variable is
 published through Xenia's resolver into the guest record, and both return
 independently checked values. A null variable resolution fails before allocation
 and the same context then loads successfully; callback tables remain valid after
@@ -129,9 +130,14 @@ basic-block budget in the Xenia PPC context; x64 and A64 emitters decrement it
 at every basic-block entry and propagate exhaustion across nested guest calls.
 The runtime test proves both typed rejection of a zero limit and a non-returning
 synthetic guest loop that exits with `ExecutionBudgetExceeded` and increments
-the exhaustion counter. Remaining gap: cancellation at a safe guest-defined
-boundary and complete reason-labelled interpreter fallback are separate
-runtime contracts.
+the exhaustion counter. A host import can now refuse with a reason rather than
+silently return; both direct import-thunk entry and a translated guest caller
+exit with `ImportServiceRefused`, preserve library/ordinal identity, increment
+the refusal counter, and permit a subsequent successful call. The import-runtime
+test owns this discriminator. The Xenia x64/A64
+post-call guard propagates the new exit reason without a separate dispatch
+path. Remaining gap: cancellation at a safe guest-defined boundary and complete
+reason-labelled interpreter fallback are separate runtime contracts.
 
 ### S012 — executable invalidation
 

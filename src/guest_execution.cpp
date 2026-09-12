@@ -4,6 +4,8 @@
 #include "guest_execution_budget.hpp"
 
 #include <cstddef>
+#include <string>
+#include <string_view>
 
 #include "xenia/cpu/function.h"
 #include "xenia/cpu/ppc/ppc_context.h"
@@ -16,6 +18,22 @@ namespace
 
 constexpr std::uint32_t kReturnAddress = 0xBCBCBCBC;
 constexpr std::size_t kRegisterArgumentCount = 8;
+
+[[nodiscard]] std::string_view RefusalReasonText(ImportRefusalReason reason) noexcept
+{
+    switch (reason)
+    {
+    case ImportRefusalReason::UnsupportedService:
+        return "unsupported service";
+    case ImportRefusalReason::InvalidGuestMemory:
+        return "invalid guest memory";
+    case ImportRefusalReason::InvalidArguments:
+        return "invalid arguments";
+    case ImportRefusalReason::HostUnavailable:
+        return "host service unavailable";
+    }
+    return "unknown refusal";
+}
 
 } // namespace
 
@@ -45,7 +63,8 @@ ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
     }
     xe::cpu::ppc::GuestExecutionBudget execution_budget{
         limits.max_guest_blocks, xe::cpu::ppc::GuestExecutionExitReason::kNone, 0};
-    const GuestExecutionBudgetScope budget_scope(*context, execution_budget);
+    GuestImportRefusal import_refusal;
+    const GuestExecutionBudgetScope budget_scope(*context, execution_budget, import_refusal);
     const GuestCallFrame call_frame(*context, kReturnAddress);
     const bool executed = function.Call(&thread_state, kReturnAddress);
     if (execution_budget.exit_reason != xe::cpu::ppc::GuestExecutionExitReason::kNone)
@@ -58,9 +77,27 @@ ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
                                "Xenia stopped the guest call after observing an executable write"},
                 0};
         }
-        return {RuntimeFailure{
+        if (execution_budget.exit_reason ==
+            xe::cpu::ppc::GuestExecutionExitReason::kHostServiceRefused)
+        {
+            return {RuntimeFailure{
+                        RuntimeError::ImportServiceRefused,
+                        "host import " + std::string(import_refusal.library) + " ordinal " +
+                            std::to_string(import_refusal.ordinal) +
+                            " refused: " + std::string(RefusalReasonText(import_refusal.reason))},
+                    0};
+        }
+        if (execution_budget.exit_reason ==
+            xe::cpu::ppc::GuestExecutionExitReason::kBlockBudgetExceeded)
+        {
+            return {
+                RuntimeFailure{
                     RuntimeError::ExecutionBudgetExceeded,
                     "Xenia stopped the guest call after exhausting its translated-block budget"},
+                0};
+        }
+        return {RuntimeFailure{RuntimeError::ExecutionFailed,
+                               "Xenia stopped the guest call with an unknown exit reason"},
                 0};
     }
     if (!executed)
