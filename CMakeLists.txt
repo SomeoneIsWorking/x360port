@@ -51,6 +51,7 @@ set(X360PORT_RUNTIME_SOURCES
     src/runtime.cpp
     src/runtime_errors.cpp
     src/runtime_imports.cpp
+    src/xam_input.cpp
     src/xenia_backend.cpp
     src/xex_helpers.cpp
     src/xex_imports.cpp
@@ -58,6 +59,7 @@ set(X360PORT_RUNTIME_SOURCES
 )
 set(X360PORT_RUNTIME_HEADERS
     include/x360port/runtime.hpp
+    include/x360port/xam_input.hpp
     src/device_dispatch.hpp
     src/executable_invalidation.hpp
     src/guest_memory.hpp
