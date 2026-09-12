@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <utility>
@@ -19,6 +20,39 @@ namespace x360port
 namespace
 {
 
+[[nodiscard]] bool IsReadable(xe::memory::PageAccess access) noexcept
+{
+    return access == xe::memory::PageAccess::kReadOnly ||
+           access == xe::memory::PageAccess::kReadWrite;
+}
+
+[[nodiscard]] bool IsWritable(xe::memory::PageAccess access) noexcept
+{
+    return access == xe::memory::PageAccess::kReadWrite;
+}
+
+[[nodiscard]] bool IsAccessible(xe::Memory* memory, GuestAddress address, std::size_t size,
+                                bool write) noexcept
+{
+    if (memory == nullptr || size > UINT32_MAX ||
+        (size != 0U && address > UINT32_MAX - static_cast<GuestAddress>(size - 1U)))
+    {
+        return false;
+    }
+    if (size == 0U)
+    {
+        return true;
+    }
+    const GuestAddress last = address + static_cast<GuestAddress>(size - 1U);
+    auto* heap = memory->LookupHeap(address);
+    if (heap == nullptr || memory->LookupHeap(last) != heap)
+    {
+        return false;
+    }
+    const auto access = heap->QueryRangeAccess(address, last);
+    return write ? IsWritable(access) : IsReadable(access);
+}
+
 [[nodiscard]] RuntimeFailure Failure(RuntimeError error, std::string detail)
 {
     return RuntimeFailure{error, std::move(detail)};
@@ -31,6 +65,36 @@ namespace
 }
 
 } // namespace
+
+bool GuestImportContext::read_memory(GuestAddress address,
+                                     std::span<std::byte> destination) const noexcept
+{
+    auto* memory = static_cast<xe::Memory*>(memory_);
+    if (!IsAccessible(memory, address, destination.size(), false))
+    {
+        return false;
+    }
+    if (!destination.empty())
+    {
+        std::memcpy(destination.data(), memory->TranslateVirtual(address), destination.size());
+    }
+    return true;
+}
+
+bool GuestImportContext::write_memory(GuestAddress address,
+                                      std::span<const std::byte> source) const noexcept
+{
+    auto* memory = static_cast<xe::Memory*>(memory_);
+    if (!IsAccessible(memory, address, source.size(), true))
+    {
+        return false;
+    }
+    if (!source.empty())
+    {
+        std::memcpy(memory->TranslateVirtual(address), source.data(), source.size());
+    }
+    return true;
+}
 
 class RuntimeImports::Impl final
 {
@@ -56,6 +120,7 @@ class RuntimeImports::Impl final
         ImportFunctionHandler function_handler;
         void* function_context;
         GuestAddress resolved_variable;
+        xe::Memory* memory = nullptr;
     };
 
     struct OwnedTable final
@@ -74,7 +139,7 @@ class RuntimeImports::Impl final
         {
             arguments[index] = call_context->r[3 + index];
         }
-        GuestImportContext context(arguments);
+        GuestImportContext context(arguments, owned_export.memory);
         owned_export.function_handler(context, owned_export.function_context);
         call_context->r[3] = context.return_value();
     }
@@ -134,6 +199,7 @@ RuntimeFailure RuntimeImports::Attach(xe::cpu::ExportResolver& resolver, xe::cpu
         resolver.RegisterTable(table->library, &table->exports_by_ordinal);
         for (const auto& owned_export : table->owned_exports)
         {
+            owned_export->memory = &memory;
             const std::uint16_t ordinal = owned_export->value.ordinal;
             if (owned_export->kind == ImportKind::Function)
             {
