@@ -351,6 +351,10 @@ class RuntimeContext::Impl final
         {
             ++statistics_.execution_budget_exhaustions;
         }
+        if (result.failure.error == RuntimeError::ExecutionInvalidated)
+        {
+            ++statistics_.execution_invalidations;
+        }
         if (result)
         {
             ++statistics_.execution_calls;

@@ -1,5 +1,7 @@
 #include "executable_invalidation.hpp"
 
+#include "guest_execution_budget.hpp"
+
 #include <algorithm>
 #include <unordered_set>
 
@@ -116,6 +118,7 @@ void ExecutableInvalidation::RecordVirtualWrite(std::uint32_t virtual_address,
         if (pending_write_.compare_exchange_weak(current, merged, std::memory_order_release,
                                                  std::memory_order_relaxed))
         {
+            MarkGuestExecutableWriteObserved();
             ++statistics_.observed_executable_writes;
             return;
         }

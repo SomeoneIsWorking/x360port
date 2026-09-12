@@ -12,9 +12,11 @@ its authenticated address, binds typed function and variable imports through
 Xenia's production export machinery, translates PPC on demand with Xenia's host
 dynarec, and calls the cached host code. Every translated public guest
 execution has a finite basic-block budget and propagates exhaustion across
-nested guest calls as a typed failure. The runtime test executes a real PPC
-leaf plus guest calls and loads through both import kinds, and requires nonzero
-emitted host code.
+nested guest calls as a typed failure. A watched executable write during a
+translated guest store exits that active call with a typed invalidation result;
+the next guest entry drains the write and invalidates affected cached code. The
+runtime test executes a real PPC leaf plus guest calls and loads through both
+import kinds, and requires nonzero emitted host code.
 
 It has no interpreter, generated-code, or fallback executor. x86-64 Linux is
 locally verified. CI executes the same synthetic runtime contract on Linux

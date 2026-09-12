@@ -31,9 +31,11 @@ through Xenia's x64 dynarec and its typed function and variable imports cross
 Xenia's production export machinery. The device-backed guest-memory callback
 boundary is now proven; executable-write notification and Xenia virtual-memory
 observation now invalidate affected cached functions while preserving unrelated
-entries. The runtime test also proves a translated guest caller can route through
-Xenia to a separate guest callee and reuse both translations. The next shared
-gap is bounded exit behavior and mid-call invalidation semantics.
+entries. A watched executable store now exits the active translated call with a
+typed invalidation result, and the next guest entry drains that write before
+dispatch. The runtime test also proves a translated guest caller can route
+through Xenia to a separate guest callee and reuse both translations. Remaining
+shared gaps are title-specific coverage and reason-labelled interpreter fallback.
 
 ## Capability details
 
@@ -134,14 +136,15 @@ runtime contracts.
 Evidence: `RuntimeContext::NotifyExecutableWrite` validates a non-empty range
 inside the authenticated code range, finds every cached Xenia function touched
 by the aligned PPC write range, and removes each function once. Xenia's maintained
-virtual-memory watch API now traps writes to the authenticated virtual code range;
-the runtime drains the coalesced range at the next guest-call boundary, resets the
-affected module functions to declared state, and re-translates them from the
-modified guest bytes. The runtime test proves the automatic path with a PPC
-self-modifying leaf, including nonzero observation and the changed return value,
-while preserving unrelated translations. Remaining gap: writes made and then
-executed before the guest returns are not drained mid-call; title behavior needs
-that stronger invalidation boundary before it can rely on self-modifying code.
+virtual-memory watch API traps writes to the authenticated virtual code range;
+the runtime records the write on the active execution budget, exits the translated
+call immediately after the guest store, then drains the coalesced range at the
+next guest-call boundary and re-translates modified guest bytes. The runtime test
+proves the typed `ExecutionInvalidated` result for a mid-call self-modifying
+function, proves the following call can dispatch after invalidation, and retains
+the existing changed-return-value and unrelated-translation checks. Remaining
+gap: title-specific write paths and complete cache-control semantics still need
+real-image evidence.
 
 ### S013 — x64 JIT execution
 

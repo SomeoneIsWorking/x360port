@@ -14,7 +14,8 @@ updated: 2026-09-12
 The bounded Xenia owner, x64 JIT call, typed function/variable import path, and
 finite translated-block exit contract now exist. The remaining root cause is
 that override/original dispatch, reason-labelled interpreter fallback, and
-executable invalidation are not fully connected to Xenia's production owners.
+complete title-level executable invalidation semantics are not fully connected
+to Xenia's production owners.
 A real title
 module therefore still cannot complete its runtime boundary.
 
@@ -27,9 +28,11 @@ synthetic PPC load and store instructions and checks callback values, addresses,
 and counters. `RuntimeContext::NotifyExecutableWrite` now also validates a
 title-reported PPC write range, removes affected cached Xenia functions, and
 proves an unrelated function remains cached. Automatic write observation,
-bounded exits, and internal guest-call routing are now proven in the synthetic
-runtime. Mid-call invalidation and reason-labelled interpreter fallback remain
-open.
+bounded exits, internal guest-call routing, and mid-call invalidation are now
+proven in the synthetic runtime. The active call exits with
+`ExecutionInvalidated` after the watched guest store, and the next guest entry
+drains the pending range before dispatch. Reason-labelled interpreter fallback
+and real-image invalidation paths remain open.
 
 ## Resolution condition
 
