@@ -23,19 +23,16 @@ static or interpreter product path.
 | S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
 | S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
 | S015 | Checked XEX2 inspection and canonical normalized-image output | verified | S001, S002, S003, S004 | G001, G002 |
+| S016 | XAM controller-state import uses a title-supplied snapshot | verified | S008, S011 | G001 |
 
 ## Current focus
 
-S012 is the current focus. The real `x360port` target executes authenticated PPC
-through Xenia's x64 dynarec and its typed function and variable imports cross
-Xenia's production export machinery. The device-backed guest-memory callback
-boundary is now proven; executable-write notification and Xenia virtual-memory
-observation now invalidate affected cached functions while preserving unrelated
-entries. A watched executable store now exits the active translated call with a
-typed invalidation result, and the next guest entry drains that write before
-dispatch. The runtime test also proves a translated guest caller can route
-through Xenia to a separate guest callee and reuse both translations. Remaining
-shared gaps are title-specific coverage and reason-labelled interpreter fallback.
+S016 is the current focus. The real `x360port` target now binds the platform
+XAM controller-state export through Xenia's typed import path and consumes a
+title-supplied snapshot. Its synthetic production-boundary test covers guest
+bytes, connection status, null queries, and refusal of invalid guest memory.
+The first real-image consumer and broader service composition remain to be
+qualified; title-specific gameplay and reason-labelled fallback are still open.
 
 ## Capability details
 
@@ -134,10 +131,11 @@ the exhaustion counter. A host import can now refuse with a reason rather than
 silently return; both direct import-thunk entry and a translated guest caller
 exit with `ImportServiceRefused`, preserve library/ordinal identity, increment
 the refusal counter, and permit a subsequent successful call. The import-runtime
-test owns this discriminator. The Xenia x64/A64
-post-call guard propagates the new exit reason without a separate dispatch
-path. Remaining gap: cancellation at a safe guest-defined boundary and complete
-reason-labelled interpreter fallback are separate runtime contracts.
+test owns this discriminator. The Xenia x64/A64 post-call guard propagates the
+new exit reason without a separate dispatch path.
+
+Gap: cancellation at a safe guest-defined boundary and complete reason-labelled
+interpreter fallback are separate runtime contracts.
 
 ### S012 — executable invalidation
 
@@ -150,8 +148,9 @@ call immediately after the guest store, then drains the coalesced range at the
 next guest-call boundary and re-translates modified guest bytes. The runtime test
 proves the typed `ExecutionInvalidated` result for a mid-call self-modifying
 function, proves the following call can dispatch after invalidation, and retains
-the existing changed-return-value and unrelated-translation checks. Remaining
-gap: title-specific write paths and complete cache-control semantics still need
+the existing changed-return-value and unrelated-translation checks.
+
+Gap: title-specific write paths and complete cache-control semantics still need
 real-image evidence.
 
 ### S013 — x64 JIT execution
@@ -238,3 +237,13 @@ copying or decompressing untrusted blocks.
 Gap: the inspector is a shared loading contract, not yet the complete Gears
 title adapter; authenticated image binding, runtime services, and the real leaf
 round-trip remain in S005.
+
+### S016 — XAM controller-state service
+
+Evidence: `x360port_import_runtime_tests` calls the bound `xam.xex` ordinal 401
+through Xenia's real import thunk. A supplied connected snapshot writes all 16
+big-endian state bytes into checked guest memory; a disconnected snapshot
+clears the previous state and returns the device-not-connected status. A null
+state pointer queries connection, while an unmapped pointer stops translated
+execution with the typed import refusal and library/ordinal context. The
+consumer owns controller-source arbitration and user-slot policy.

@@ -1,4 +1,5 @@
 #include "x360port/runtime.hpp"
+#include "x360port/xam_input.hpp"
 
 #include <array>
 #include <cstddef>
@@ -21,6 +22,8 @@ constexpr GuestAddress kVariableCallAddress = kImportedCallAddress + 0x30;
 constexpr GuestAddress kVariableRecordAddress = kImportedCallAddress + 0x48;
 constexpr GuestAddress kFunctionRecordAddress = kImportedCallAddress + 0x4C;
 constexpr GuestAddress kVariableValueAddress = kImportedCallAddress + 0x58;
+constexpr GuestAddress kLoadWordAddress = kImportedCallAddress + 0x60;
+constexpr GuestAddress kXamInputImportAddress = kImportedCallAddress + 0x70;
 
 struct ImportObservations
 {
@@ -32,6 +35,23 @@ struct ImportObservations
     std::optional<ImportRefusalReason> refusal_reason;
     std::uint32_t variable_resolutions = 0;
 };
+
+struct PadObservations
+{
+    XamPadSnapshot snapshot;
+    std::uint32_t calls = 0;
+    std::uint32_t last_user = 0;
+    std::uint32_t last_flags = 0;
+};
+
+XamPadSnapshot ReadPad(XamInputRequest request, void* context) noexcept
+{
+    auto& observations = *static_cast<PadObservations*>(context);
+    ++observations.calls;
+    observations.last_user = request.user_index;
+    observations.last_flags = request.flags;
+    return observations.snapshot;
+}
 
 void FunctionImport(GuestImportContext& call, void* context) noexcept
 {
@@ -78,6 +98,9 @@ class ImportedTestModule final : public GuestModule
                        "CallSynthetic",      kFunctionImportAddress, kFunctionRecordAddress};
         imports_[1] = {ImportKind::Variable, "synthetic.xex",        2U,
                        "VariableSynthetic",  kVariableRecordAddress, kVariableRecordAddress};
+        imports_[2] = {ImportKind::Function,     "xam.xex",
+                       kXamInputGetStateOrdinal, "XamInputGetState",
+                       kXamInputImportAddress,   kXamInputImportAddress};
         constexpr std::array<std::uint8_t, 24> FunctionCaller{
             0x7D, 0x88, 0x02, 0xA6, // mflr r12
             0x38, 0x60, 0x00, 0x07, // li r3, 7
@@ -97,12 +120,17 @@ class ImportedTestModule final : public GuestModule
         CopyBytes(kVariableCallAddress - kImportedCallAddress, VariableCaller);
         constexpr std::array<std::uint8_t, 4> VariableValue{0x12, 0x34, 0x56, 0x78};
         CopyBytes(kVariableValueAddress - kImportedCallAddress, VariableValue);
+        constexpr std::array<std::uint8_t, 8> LoadWord{
+            0x80, 0x63, 0x00, 0x00, // lwz r3, 0(r3)
+            0x4E, 0x80, 0x00, 0x20, // blr
+        };
+        CopyBytes(kLoadWordAddress - kImportedCallAddress, LoadWord);
 
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kImportedCallAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
         descriptor_.image.entry_point = kImportedCallAddress;
-        descriptor_.code = {kImportedCallAddress, 0x44U};
+        descriptor_.code = {kImportedCallAddress, 0x80U};
         descriptor_.import_count = imports_.size();
         descriptor_.import_manifest_sha256 = HashImportManifest(imports_);
     }
@@ -129,8 +157,8 @@ class ImportedTestModule final : public GuestModule
         }
     }
 
-    std::array<std::byte, 0x60> image_{};
-    std::array<ImportRequirement, 2> imports_;
+    std::array<std::byte, 0x90> image_{};
+    std::array<ImportRequirement, 3> imports_;
     ModuleDescriptor descriptor_{};
 };
 
@@ -152,15 +180,17 @@ void Require(bool condition, std::string_view message)
 
 int main()
 {
+    ImportObservations observations;
+    PadObservations pad_observations;
+    XamInputService xam_input(ReadPad, &pad_observations);
     RuntimeCreateResult imported = RuntimeContext::Create();
     Require(static_cast<bool>(imported), imported.failure.detail);
-    ImportObservations observations;
     GuestMemoryAllocationResult import_scratch = imported.context->AllocateGuestMemory(4);
     Require(static_cast<bool>(import_scratch), import_scratch.failure.detail);
     observations.scratch_address = import_scratch.allocation.address;
     {
         ImportedTestModule imported_module;
-        std::array<ImportBinding, 2> bindings{
+        std::array<ImportBinding, 3> bindings{
             ImportBinding{.library = "synthetic.xex",
                           .ordinal = 1U,
                           .kind = ImportKind::Function,
@@ -171,7 +201,11 @@ int main()
                           .kind = ImportKind::Variable,
                           .variable_resolver = RefuseVariable,
                           .variable_resolution_context = &observations},
+            ImportBinding{.library = "xam.xex",
+                          .ordinal = kXamInputGetStateOrdinal,
+                          .kind = ImportKind::Function},
         };
+        xam_input.Bind(imported_module.ImportManifest()[2], bindings[2]);
         RuntimeFailure loaded = imported.context->LoadModule(imported_module, bindings);
         Require(loaded.error == RuntimeError::VariableResolutionFailed,
                 "a null variable resolution did not fail with its typed reason");
@@ -219,7 +253,67 @@ int main()
     Require(variable_call.value == 0x12345678U,
             "guest PPC did not load through the bound variable import record");
 
-    std::cout << "import runtime contract: typed function, variable, and refusal paths crossed "
+    GuestMemoryAllocationResult state_memory = imported.context->AllocateGuestMemory(16U);
+    Require(static_cast<bool>(state_memory), state_memory.failure.detail);
+    const GuestAddress state_address = state_memory.allocation.address;
+    pad_observations.snapshot = {.connected = true,
+                                 .packet_number = 0x12345678U,
+                                 .buttons = 0xABCDU,
+                                 .left_trigger = 0x12U,
+                                 .right_trigger = 0x34U,
+                                 .thumb_lx = -30875,
+                                 .thumb_ly = 0x1234,
+                                 .thumb_rx = -292,
+                                 .thumb_ry = 0x5678};
+    const std::array<std::uint64_t, 3> state_arguments{0U, 1U, state_address};
+    const ExecutionResult connected =
+        imported.context->Execute(kXamInputImportAddress, state_arguments);
+    Require(static_cast<bool>(connected) && connected.value == 0U && pad_observations.calls == 1U &&
+                pad_observations.last_user == 0U && pad_observations.last_flags == 1U,
+            "XamInputGetState did not poll the bound source with the guest arguments");
+    constexpr std::array<std::uint32_t, 4> expected_state{0x12345678U, 0xABCD1234U, 0x87651234U,
+                                                          0xFEDC5678U};
+    for (std::size_t word = 0; word < expected_state.size(); ++word)
+    {
+        const std::array<std::uint64_t, 1> read_address{state_address +
+                                                        static_cast<GuestAddress>(word * 4U)};
+        const ExecutionResult loaded_word =
+            imported.context->Execute(kLoadWordAddress, read_address);
+        Require(static_cast<bool>(loaded_word) && loaded_word.value == expected_state[word],
+                "XamInputGetState did not write the big-endian guest state");
+    }
+
+    pad_observations.snapshot = {};
+    const ExecutionResult disconnected =
+        imported.context->Execute(kXamInputImportAddress, state_arguments);
+    Require(static_cast<bool>(disconnected) && disconnected.value == kXamInputDeviceNotConnected,
+            "a disconnected XAM controller did not return its device status");
+    for (std::size_t word = 0; word < expected_state.size(); ++word)
+    {
+        const std::array<std::uint64_t, 1> read_address{state_address +
+                                                        static_cast<GuestAddress>(word * 4U)};
+        const ExecutionResult cleared = imported.context->Execute(kLoadWordAddress, read_address);
+        Require(static_cast<bool>(cleared) && cleared.value == 0U,
+                "a disconnected XAM controller did not clear the prior guest state");
+    }
+
+    pad_observations.snapshot.connected = true;
+    const std::array<std::uint64_t, 3> query_arguments{0U, 0U, 0U};
+    const ExecutionResult query =
+        imported.context->Execute(kXamInputImportAddress, query_arguments);
+    Require(static_cast<bool>(query) && query.value == 0U,
+            "a null XAM state pointer did not query controller connection");
+    const std::array<std::uint64_t, 3> invalid_arguments{0U, 0U, UINT32_MAX};
+    const ExecutionResult invalid_state =
+        imported.context->Execute(kXamInputImportAddress, invalid_arguments);
+    Require(invalid_state.failure.error == RuntimeError::ImportServiceRefused &&
+                invalid_state.failure.detail.find("xam.xex ordinal 401") != std::string::npos &&
+                invalid_state.failure.detail.find("invalid guest memory") != std::string::npos &&
+                imported.context->Statistics().import_service_refusals == 3U,
+            "an invalid XAM state pointer did not stop translated guest execution");
+
+    std::cout << "import runtime contract: typed function, variable, XAM input, and refusal paths "
+                 "crossed "
                  "Xenia's export machinery\n";
     return 0;
 }
