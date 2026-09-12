@@ -8,6 +8,7 @@
 
 #include "xenia_backend.hpp"
 #include "xex_helpers.hpp"
+#include "xex_imports.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -78,30 +79,6 @@ struct ImportContext
            (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[offset + 1U])) << 16U) |
            (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[offset + 2U])) << 8U) |
            static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[offset + 3U]));
-}
-
-[[nodiscard]] std::string ReadCString(std::span<const std::byte> bytes, std::size_t offset,
-                                      std::size_t limit)
-{
-    if (offset >= limit)
-    {
-        return {};
-    }
-    const std::size_t end = std::find_if(bytes.begin() + static_cast<std::ptrdiff_t>(offset),
-                                         bytes.begin() + static_cast<std::ptrdiff_t>(limit),
-                                         [](std::byte value) { return value == std::byte{0}; }) -
-                            bytes.begin();
-    if (end == limit)
-    {
-        return {};
-    }
-    std::string result;
-    result.reserve(end - offset);
-    for (std::size_t index = offset; index < end; ++index)
-    {
-        result.push_back(static_cast<char>(std::to_integer<std::uint8_t>(bytes[index])));
-    }
-    return result;
 }
 
 [[nodiscard]] std::optional<OptionalHeader> FindOptional(std::span<const std::byte> xex,
@@ -241,16 +218,6 @@ struct ImportContext
     return offset <= image.size && bytes <= image.size - static_cast<std::size_t>(offset);
 }
 
-[[nodiscard]] std::string BaseLibraryName(std::string name)
-{
-    const std::size_t slash = name.find_last_of("/\\");
-    if (slash != std::string::npos)
-    {
-        name.erase(0, slash + 1U);
-    }
-    return name;
-}
-
 void WriteU32Le(std::span<std::byte> bytes, std::size_t offset, std::uint32_t value)
 {
     bytes[offset] = static_cast<std::byte>(value & 0xffU);
@@ -299,6 +266,15 @@ void NormalizeFunctionStub(std::span<std::byte> image, std::size_t offset)
         error = "XEX import-library table starts outside its descriptor";
         return false;
     }
+    std::vector<std::string> library_names;
+    if (!ParseImportLibraryNames(header,
+                                 {.string_offset = string_offset,
+                                  .string_size = string_size,
+                                  .library_count = library_count},
+                                 library_names, error))
+    {
+        return false;
+    }
     std::size_t cursor = library_offset;
     for (std::uint32_t library_index = 0; library_index < library_count; ++library_index)
     {
@@ -313,19 +289,12 @@ void NormalizeFunctionStub(std::span<std::byte> image, std::size_t offset)
         const std::uint16_t import_count = ReadU16Be(header, cursor + 0x26U);
         const std::uint64_t table_bytes = static_cast<std::uint64_t>(import_count) * 4U;
         if (library_size < kImportLibraryMinimum || table_bytes > library_size - 0x28U ||
-            library_size > offset + option_size - cursor || name_index >= string_size)
+            library_size > offset + option_size - cursor || name_index >= library_names.size())
         {
             error = "XEX import-library record has invalid bounds";
             return false;
         }
-        std::string library =
-            ReadCString(header, string_offset + name_index, string_offset + string_size);
-        if (library.empty())
-        {
-            error = "XEX import-library name is missing or unterminated";
-            return false;
-        }
-        library = BaseLibraryName(std::move(library));
+        const std::string& library = library_names[name_index];
         struct RawImport
         {
             std::uint32_t ordinal = 0;

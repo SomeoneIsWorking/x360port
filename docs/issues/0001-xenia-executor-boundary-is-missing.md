@@ -35,7 +35,9 @@ title-neutral `GuestImportContext` while retaining Xenia's private trampoline
 ABI. The active call exits with
 `ExecutionInvalidated` after the watched guest store, and the next guest entry
 drains the pending range before dispatch. Reason-labelled interpreter fallback
-and real-image invalidation paths remain open.
+and real-image invalidation paths remain open. The checked XEX inspector now
+resolves the XEX import-library string table by library index and alignment,
+preserving the real image's `xam.xex` and `xboxkrnl.exe` bindings.
 
 ## Resolution condition
 
