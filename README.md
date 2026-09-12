@@ -16,7 +16,10 @@ nested guest calls as a typed failure. A watched executable write during a
 translated guest store exits that active call with a typed invalidation result;
 the next guest entry drains the write and invalidates affected cached code. The
 runtime test executes a real PPC leaf plus guest calls and loads through both
-import kinds, and requires nonzero emitted host code.
+import kinds, and requires nonzero emitted host code. Function imports expose
+the eight Xenon register arguments and a return-value setter through the
+title-neutral `GuestImportContext`; the Xenia kernel trampoline remains private
+to this adapter.
 
 It has no interpreter, generated-code, or fallback executor. x86-64 Linux is
 locally verified. CI executes the same synthetic runtime contract on Linux

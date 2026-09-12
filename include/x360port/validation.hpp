@@ -3,6 +3,7 @@
 
 #include "x360port/module_contract.hpp"
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -11,7 +12,35 @@
 namespace x360port
 {
 
-using ImportFunctionHandler = void (*)(void* call_context, void* kernel_context,
+class RuntimeImports;
+
+class GuestImportContext final
+{
+  public:
+    static constexpr std::size_t argument_count = 8;
+
+    [[nodiscard]] std::uint64_t argument(std::size_t index) const noexcept
+    {
+        return index < arguments_.size() ? arguments_[index] : 0;
+    }
+
+    void set_return_value(std::uint64_t value) noexcept { return_value_ = value; }
+
+  private:
+    friend class RuntimeImports;
+
+    explicit GuestImportContext(const std::array<std::uint64_t, argument_count>& arguments) noexcept
+        : arguments_(arguments), return_value_(arguments[0])
+    {
+    }
+
+    [[nodiscard]] std::uint64_t return_value() const noexcept { return return_value_; }
+
+    std::array<std::uint64_t, argument_count> arguments_{};
+    std::uint64_t return_value_ = 0;
+};
+
+using ImportFunctionHandler = void (*)(GuestImportContext& context,
                                        void* function_context) noexcept;
 using ImportVariableResolver = GuestAddress (*)(void* resolution_context) noexcept;
 

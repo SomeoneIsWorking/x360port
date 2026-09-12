@@ -15,7 +15,7 @@ namespace
 
 using namespace x360port;
 
-void ImportThunk(void*, void*, void*) noexcept {}
+void ImportThunk(GuestImportContext&, void*) noexcept {}
 [[nodiscard]] GuestAddress ResolveVariable(void*) noexcept { return 0x8200001cU; }
 
 class SyntheticModule final : public GuestModule

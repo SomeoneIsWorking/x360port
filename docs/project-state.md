@@ -90,7 +90,9 @@ gameplay.
 
 Evidence: `x360port_runtime_tests` loads an authenticated synthetic module whose
 guest PPC calls a function import and loads a variable import. The function
-crosses Xenia's real syscall thunk and typed export callback, the variable is
+crosses Xenia's real syscall thunk and typed export callback, whose
+`GuestImportContext` exposes the eight register arguments and return-value
+propagation; the variable is
 published through Xenia's resolver into the guest record, and both return
 independently checked values. A null variable resolution fails before allocation
 and the same context then loads successfully; callback tables remain valid after

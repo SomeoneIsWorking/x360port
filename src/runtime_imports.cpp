@@ -1,5 +1,6 @@
 #include "runtime_imports.hpp"
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -64,12 +65,18 @@ class RuntimeImports::Impl final
         std::vector<xe::cpu::Export*> exports_by_ordinal;
     };
 
-    static void DispatchFunction(xe::cpu::ppc::PPCContext* call_context,
-                                 xe::kernel::KernelState* kernel_context,
+    static void DispatchFunction(xe::cpu::ppc::PPCContext* call_context, xe::kernel::KernelState*,
                                  void* callback_context) noexcept
     {
         auto& owned_export = *static_cast<OwnedExport*>(callback_context);
-        owned_export.function_handler(call_context, kernel_context, owned_export.function_context);
+        std::array<std::uint64_t, GuestImportContext::argument_count> arguments{};
+        for (std::size_t index = 0; index < arguments.size(); ++index)
+        {
+            arguments[index] = call_context->r[3 + index];
+        }
+        GuestImportContext context(arguments);
+        owned_export.function_handler(context, owned_export.function_context);
+        call_context->r[3] = context.return_value();
     }
 
     std::vector<std::unique_ptr<OwnedTable>> tables;

@@ -86,6 +86,7 @@ class TestModule final : public GuestModule
 struct ImportObservations
 {
     std::uint32_t function_calls = 0;
+    std::uint64_t last_function_argument = 0;
     std::uint32_t variable_resolutions = 0;
 };
 
@@ -129,9 +130,12 @@ ExecutionResult AddOneThroughOriginal(RuntimeContext& runtime, GuestAddress addr
     return original;
 }
 
-void FunctionImport(void*, void*, void* context) noexcept
+void FunctionImport(GuestImportContext& call, void* context) noexcept
 {
-    ++static_cast<ImportObservations*>(context)->function_calls;
+    auto& observations = *static_cast<ImportObservations*>(context);
+    ++observations.function_calls;
+    observations.last_function_argument = call.argument(0);
+    call.set_return_value(call.argument(0));
 }
 
 [[nodiscard]] GuestAddress ResolveVariable(void* context) noexcept
@@ -450,6 +454,8 @@ int main()
     Require(imported_call.value == 8, "guest execution did not return across the host import");
     Require(observations.function_calls == 1,
             "guest PPC did not call the bound host function import with its context");
+    Require(observations.last_function_argument == 7,
+            "the typed function import context did not expose the guest argument");
 
     ExecutionResult variable_call = imported.context->Execute(kVariableCallAddress);
     Require(static_cast<bool>(variable_call), variable_call.failure.detail);
