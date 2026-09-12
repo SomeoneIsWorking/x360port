@@ -1,5 +1,7 @@
 #include "runtime_imports.hpp"
 
+#include "guest_execution_budget.hpp"
+
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -103,8 +105,9 @@ class RuntimeImports::Impl final
     {
         OwnedExport(const ImportRequirement& requirement, const ImportBinding& binding,
                     GuestAddress resolved_variable)
-            : name(requirement.name), value(static_cast<std::uint16_t>(requirement.ordinal),
-                                            ExportType(requirement.kind), name.c_str()),
+            : library(requirement.library), name(requirement.name),
+              value(static_cast<std::uint16_t>(requirement.ordinal), ExportType(requirement.kind),
+                    name.c_str()),
               kind(requirement.kind), address(requirement.address),
               record_address(requirement.record_address),
               function_handler(binding.function_handler),
@@ -112,6 +115,7 @@ class RuntimeImports::Impl final
         {
         }
 
+        std::string library;
         std::string name;
         xe::cpu::Export value;
         ImportKind kind;
@@ -141,6 +145,11 @@ class RuntimeImports::Impl final
         }
         GuestImportContext context(arguments, owned_export.memory);
         owned_export.function_handler(context, owned_export.function_context);
+        if (const auto refusal = context.refusal())
+        {
+            MarkGuestImportRefused(owned_export.library, owned_export.value.ordinal, *refusal);
+            return;
+        }
         call_context->r[3] = context.return_value();
     }
 

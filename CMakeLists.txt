@@ -17,7 +17,7 @@ option(X360PORT_VALIDATION_ONLY
        OFF)
 set(X360PORT_XENIA_SOURCE_DIR "" CACHE PATH
     "Path to the pinned Xenia source checkout used by the x360port executor")
-set(X360PORT_XENIA_REVISION "d77aad9116c936cf1c7a40231f210d17094bed9e")
+set(X360PORT_XENIA_REVISION "6e7a22f129f59f1a00a7ee6f61e55d40842a2573")
 
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp
@@ -176,6 +176,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         x360port_enable_warnings(x360port_runtime_tests)
         add_test(NAME runtime COMMAND x360port_runtime_tests)
 
+        add_executable(x360port_import_runtime_tests tests/import_runtime_tests.cpp)
+        target_link_libraries(x360port_import_runtime_tests PRIVATE x360port)
+        x360port_enable_warnings(x360port_import_runtime_tests)
+        add_test(NAME import_runtime COMMAND x360port_import_runtime_tests)
+
         add_executable(x360port_xex_inspect_tests tests/xex_inspect_tests.cpp)
         target_link_libraries(x360port_xex_inspect_tests PRIVATE x360port)
         x360port_enable_warnings(x360port_xex_inspect_tests)
@@ -190,6 +195,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 ${X360PORT_RUNTIME_SOURCES}
                 ${X360PORT_RUNTIME_HEADERS}
                 tests/contract_tests.cpp
+                tests/import_runtime_tests.cpp
                 tests/runtime_tests.cpp
                 tests/xex_inspect_tests.cpp
                 tests/warnings/probe.cpp
@@ -209,6 +215,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
                     --warnings-as-errors=*
                     ${X360PORT_RUNTIME_SOURCES}
+                    tests/import_runtime_tests.cpp
                     tests/runtime_tests.cpp
                     tests/xex_inspect_tests.cpp
                     src/xenia_backend.cpp
