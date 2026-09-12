@@ -16,7 +16,7 @@ and reuses Xenia's code cache. Keep `x360port_validation` only as the diagnostic
 contract target; it is never a substitute backend. Unknown or ambiguous
 image/import/override identity fails closed.
 
-Xenia revision `185b4fc4e0f8e37a40941246060ff589e8aa6db7` from the maintained
+Xenia revision `271535bdb35c8ecdb09cd70c3717617971fbfd1e` from the maintained
 `SomeoneIsWorking/xenia-canary` `main` branch is the executable
 contract. Do not make that pin caller-overridable. The public Pimpl boundary
 must not expose Xenia types or libstdc++ ABI choices. On GNU libstdc++ Debug

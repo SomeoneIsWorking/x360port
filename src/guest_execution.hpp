@@ -14,6 +14,9 @@ class ThreadState;
 namespace x360port
 {
 
+[[nodiscard]] RuntimeFailure PrepareGuestArguments(xe::cpu::ThreadState& thread_state,
+                                                   std::span<const std::uint64_t> arguments);
+
 [[nodiscard]] ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
                                                    xe::cpu::ThreadState& thread_state,
                                                    std::span<const std::uint64_t> arguments,

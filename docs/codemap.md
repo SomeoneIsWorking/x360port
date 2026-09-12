@@ -20,7 +20,7 @@
 | Repository build, dependency preparation, and verification tooling | `tools/{build_support,verify,xenia_dependencies,check_structure}.py` | One locked Python entry point owns host checks, exact Xenia dependency preparation, Clang/Ninja configuration, build, lint, and real synthetic runtime tests. |
 | Tooling policy falsifiers | `tools/tests/` | Exercise the shipping dependency-preparation and nested-CMake policy rather than duplicating it in test helpers. |
 | First-party compiler diagnostics | `cmake/Warnings.cmake`, `tests/warnings/probe.cpp` | Apply the same warning groups with native driver syntax to every first-party library and test target; test the warning policy without altering Xenia's flags. |
-| Xenon execution, guest memory, decoding, lowering, host emission, block cache | pinned Xenia revision | Consumed by `RuntimeContext`; CPU/JIT semantics stay in Xenia. |
+| Xenon execution, guest memory, decoding, lowering, host emission, block cache, bounded fallback | pinned Xenia revision | Consumed by `RuntimeContext`; CPU/JIT and bounded fallback semantics stay in Xenia. |
 | Runtime overrides and original calls | `include/x360port/runtime.hpp`, `src/runtime.cpp`, `src/override_dispatch.{hpp,cpp}`, `src/guest_execution_budget.hpp` | Bind authenticated entries to Xenia guest-call redirects; host entry and cached guest callers use one override table, while scoped original calls enter the translated body directly. Guest callback failures exit the active bounded call with their typed reason. |
 | Title identity, addresses, imports, overrides, policy | consuming title | Never add them here. |
 

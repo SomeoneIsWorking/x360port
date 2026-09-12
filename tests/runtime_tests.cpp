@@ -45,7 +45,7 @@ class TestModule final : public GuestModule
                         0x4E800420});
         CopyWords(160, {0x7C0802A6, 0x4BFFFF5D, 0x7C0803A6, 0x4E800020});
         CopyWords(176, {0x00000001, 0x4E800020}); // primary opcode zero is invalid
-        CopyWords(184, {0x7C0004AA, 0x4E800020}); // lswi is decoded but has no implementation
+        CopyWords(184, {0x7C6324AA, 0x4E800020}); // lswi r3,r3,4 is decoded but unsupported by JIT
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -194,7 +194,7 @@ int main()
     const JitStatistics before_invalid_opcode = created.context->Statistics();
     const ExecutionResult invalid_opcode = created.context->Execute(kInvalidOpcodeAddress);
     Require(!invalid_opcode, "an invalid PPC opcode was silently translated");
-    Require(invalid_opcode.failure.error == RuntimeError::TranslationFailed,
+    Require(invalid_opcode.failure.error == RuntimeError::InterpreterFallbackUnsupported,
             invalid_opcode.failure.detail);
     Require(created.context->Statistics().translated_functions ==
                     before_invalid_opcode.translated_functions &&
@@ -203,18 +203,48 @@ int main()
                 created.context->Statistics().execution_calls ==
                     before_invalid_opcode.execution_calls,
             "an invalid PPC opcode published or executed host code");
+    const GuestMemoryAllocationResult fallback_memory = created.context->AllocateGuestMemory(4U);
+    Require(static_cast<bool>(fallback_memory), fallback_memory.failure.detail);
+    const std::array<std::byte, 4> fallback_bytes{std::byte{0x12}, std::byte{0x34}, std::byte{0x56},
+                                                  std::byte{0x78}};
+    Require(!created.context->WriteGuestMemory(fallback_memory.allocation.address, fallback_bytes),
+            "fallback input bytes could not be written");
+    const std::array<std::uint64_t, 1> fallback_arguments{fallback_memory.allocation.address};
     const ExecutionResult unimplemented_opcode =
-        created.context->Execute(kUnimplementedOpcodeAddress);
-    Require(!unimplemented_opcode &&
-                unimplemented_opcode.failure.error == RuntimeError::TranslationFailed,
-            "an unimplemented PPC opcode was silently translated or given an unrelated refusal");
+        created.context->Execute(kUnimplementedOpcodeAddress, fallback_arguments);
+    Require(static_cast<bool>(unimplemented_opcode) && unimplemented_opcode.value == 0x12345678U,
+            unimplemented_opcode.failure.detail);
+    Require(created.context->Statistics().interpreter_fallback_entries == 2 &&
+                created.context->Statistics().interpreter_fallback_unsupported == 1 &&
+                created.context->Statistics().interpreter_fallback_instructions == 3,
+            "the fallback transition and executed instruction counts were not reason-labelled");
     Require(created.context->Statistics().translated_functions ==
                     before_invalid_opcode.translated_functions &&
                 created.context->Statistics().emitted_host_bytes ==
                     before_invalid_opcode.emitted_host_bytes &&
                 created.context->Statistics().execution_calls ==
-                    before_invalid_opcode.execution_calls,
-            "an unimplemented PPC opcode published or executed host code");
+                    before_invalid_opcode.execution_calls + 1U,
+            "the fallback path published translated host code or missed its successful call");
+    ExecutionLimits budget_limits;
+    budget_limits.max_interpreter_instructions = 1;
+    const ExecutionResult budget_exhausted =
+        created.context->Execute(kUnimplementedOpcodeAddress, fallback_arguments, budget_limits);
+    Require(!budget_exhausted &&
+                budget_exhausted.failure.error == RuntimeError::InterpreterFallbackBudgetExceeded,
+            "the fallback instruction budget was not enforced");
+    const std::array<std::uint64_t, 1> invalid_fallback_arguments{0};
+    const ExecutionResult invalid_fallback =
+        created.context->Execute(kUnimplementedOpcodeAddress, invalid_fallback_arguments);
+    Require(!invalid_fallback &&
+                invalid_fallback.failure.error == RuntimeError::InterpreterFallbackMemoryInvalid,
+            "the fallback memory refusal was not reason-labelled");
+    Require(created.context->Statistics().interpreter_fallback_entries == 4 &&
+                created.context->Statistics().interpreter_fallback_instructions == 5 &&
+                created.context->Statistics().interpreter_fallback_memory_failures == 1 &&
+                created.context->Statistics().interpreter_fallback_budget_exhaustions == 1,
+            "the fallback budget and memory refusal counts were not recorded");
+    Require(!created.context->ReleaseGuestMemory(fallback_memory.allocation),
+            "fallback guest-memory fixture could not be released");
 
     const std::uint64_t translations_before_internal_call =
         created.context->Statistics().translated_functions;
