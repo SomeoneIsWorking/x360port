@@ -26,6 +26,8 @@ constexpr GuestAddress kDeviceReadAddress = kCodeAddress + 8;
 constexpr GuestAddress kDeviceWriteAddress = kCodeAddress + 24;
 constexpr GuestAddress kInvalidOpcodeAddress = kCodeAddress + 176;
 constexpr GuestAddress kUnimplementedOpcodeAddress = kCodeAddress + 184;
+constexpr GuestAddress kControlFlowAddress = kCodeAddress + 192;
+constexpr GuestAddress kMemoryFallbackAddress = kCodeAddress + 216;
 constexpr std::uint32_t kDeviceAddress = 0xC0001000;
 class TestModule final : public GuestModule
 {
@@ -46,6 +48,8 @@ class TestModule final : public GuestModule
         CopyWords(160, {0x7C0802A6, 0x4BFFFF5D, 0x7C0803A6, 0x4E800020});
         CopyWords(176, {0x00000001, 0x4E800020}); // primary opcode zero is invalid
         CopyWords(184, {0x7C6324AA, 0x4E800020}); // lswi r3,r3,4 is decoded but unsupported by JIT
+        CopyWords(192, {0x7C6324AA, 0x2C030000, 0x41820008, 0x38600063, 0x4E800020});
+        CopyWords(216, {0x7C8324AA, 0x90830004, 0x80630004, 0x4E800020});
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -79,7 +83,7 @@ class TestModule final : public GuestModule
         }
     }
 
-    std::array<std::byte, 192> image_{};
+    std::array<std::byte, 256> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -203,10 +207,11 @@ int main()
                 created.context->Statistics().execution_calls ==
                     before_invalid_opcode.execution_calls,
             "an invalid PPC opcode published or executed host code");
-    const GuestMemoryAllocationResult fallback_memory = created.context->AllocateGuestMemory(4U);
+    const GuestMemoryAllocationResult fallback_memory = created.context->AllocateGuestMemory(8U);
     Require(static_cast<bool>(fallback_memory), fallback_memory.failure.detail);
-    const std::array<std::byte, 4> fallback_bytes{std::byte{0x12}, std::byte{0x34}, std::byte{0x56},
-                                                  std::byte{0x78}};
+    std::array<std::byte, 8> fallback_bytes{std::byte{0x12}, std::byte{0x34}, std::byte{0x56},
+                                            std::byte{0x78}, std::byte{0},    std::byte{0},
+                                            std::byte{0},    std::byte{0}};
     Require(!created.context->WriteGuestMemory(fallback_memory.allocation.address, fallback_bytes),
             "fallback input bytes could not be written");
     const std::array<std::uint64_t, 1> fallback_arguments{fallback_memory.allocation.address};
@@ -225,6 +230,35 @@ int main()
                 created.context->Statistics().execution_calls ==
                     before_invalid_opcode.execution_calls + 1U,
             "the fallback path published translated host code or missed its successful call");
+    fallback_bytes = {std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0},
+                      std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0}};
+    Require(!created.context->WriteGuestMemory(fallback_memory.allocation.address, fallback_bytes),
+            "the zero control-flow fixture could not be written");
+    const ExecutionResult taken_branch =
+        created.context->Execute(kControlFlowAddress, fallback_arguments);
+    Require(static_cast<bool>(taken_branch) && taken_branch.value == 0,
+            "the fallback conditional branch did not take the zero case");
+    fallback_bytes[3] = std::byte{1};
+    Require(!created.context->WriteGuestMemory(fallback_memory.allocation.address, fallback_bytes),
+            "the nonzero control-flow fixture could not be written");
+    const ExecutionResult fallthrough_branch =
+        created.context->Execute(kControlFlowAddress, fallback_arguments);
+    Require(static_cast<bool>(fallthrough_branch) && fallthrough_branch.value == 99,
+            "the fallback conditional branch did not execute its fallthrough case");
+    Require(created.context->Statistics().interpreter_fallback_entries == 4 &&
+                created.context->Statistics().interpreter_fallback_instructions == 12,
+            "the fallback control-flow instructions were not counted");
+    fallback_bytes = {std::byte{0x12}, std::byte{0x34}, std::byte{0x56}, std::byte{0x78},
+                      std::byte{0},    std::byte{0},    std::byte{0},    std::byte{0}};
+    Require(!created.context->WriteGuestMemory(fallback_memory.allocation.address, fallback_bytes),
+            "the memory fallback fixture could not be written");
+    const ExecutionResult memory_fallback =
+        created.context->Execute(kMemoryFallbackAddress, fallback_arguments);
+    Require(static_cast<bool>(memory_fallback) && memory_fallback.value == 0x12345678U,
+            "the fallback big-endian load/store instructions returned the wrong value");
+    Require(created.context->Statistics().interpreter_fallback_entries == 5 &&
+                created.context->Statistics().interpreter_fallback_instructions == 16,
+            "the fallback memory instructions were not counted");
     ExecutionLimits budget_limits;
     budget_limits.max_interpreter_instructions = 1;
     const ExecutionResult budget_exhausted =
@@ -238,8 +272,8 @@ int main()
     Require(!invalid_fallback &&
                 invalid_fallback.failure.error == RuntimeError::InterpreterFallbackMemoryInvalid,
             "the fallback memory refusal was not reason-labelled");
-    Require(created.context->Statistics().interpreter_fallback_entries == 4 &&
-                created.context->Statistics().interpreter_fallback_instructions == 5 &&
+    Require(created.context->Statistics().interpreter_fallback_entries == 7 &&
+                created.context->Statistics().interpreter_fallback_instructions == 18 &&
                 created.context->Statistics().interpreter_fallback_memory_failures == 1 &&
                 created.context->Statistics().interpreter_fallback_budget_exhaustions == 1,
             "the fallback budget and memory refusal counts were not recorded");

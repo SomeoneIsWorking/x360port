@@ -17,7 +17,7 @@ option(X360PORT_VALIDATION_ONLY
        OFF)
 set(X360PORT_XENIA_SOURCE_DIR "" CACHE PATH
     "Path to the pinned Xenia source checkout used by the x360port executor")
-set(X360PORT_XENIA_REVISION "271535bdb35c8ecdb09cd70c3717617971fbfd1e")
+set(X360PORT_XENIA_REVISION "b7b471a66120932ef3f738e004233061db6127a5")
 
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp
