@@ -37,6 +37,12 @@ std::string_view ToString(RuntimeError error) noexcept
         return "entry outside code";
     case RuntimeError::TranslationFailed:
         return "translation failed";
+    case RuntimeError::InterpreterFallbackUnsupported:
+        return "interpreter fallback unsupported";
+    case RuntimeError::InterpreterFallbackMemoryInvalid:
+        return "interpreter fallback memory invalid";
+    case RuntimeError::InterpreterFallbackBudgetExceeded:
+        return "interpreter fallback budget exceeded";
     case RuntimeError::ExecutionBudgetInvalid:
         return "invalid guest execution block budget";
     case RuntimeError::ExecutionBudgetExceeded:

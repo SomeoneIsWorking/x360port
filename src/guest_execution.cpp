@@ -38,17 +38,31 @@ constexpr std::size_t kRegisterArgumentCount = 8;
 
 } // namespace
 
+RuntimeFailure PrepareGuestArguments(xe::cpu::ThreadState& thread_state,
+                                     std::span<const std::uint64_t> arguments)
+{
+    if (arguments.size() > kRegisterArgumentCount)
+    {
+        return {RuntimeError::ExecutionFailed,
+                "this bounded call contract accepts at most eight register arguments"};
+    }
+
+    auto* context = thread_state.context();
+    for (std::size_t index = 0; index < arguments.size(); ++index)
+    {
+        context->r[3 + index] = arguments[index];
+    }
+    return {};
+}
+
 ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
                                      xe::cpu::ThreadState& thread_state,
                                      std::span<const std::uint64_t> arguments,
                                      ExecutionLimits limits)
 {
-    if (arguments.size() > kRegisterArgumentCount)
+    if (const RuntimeFailure failure = PrepareGuestArguments(thread_state, arguments))
     {
-        return {
-            RuntimeFailure{RuntimeError::ExecutionFailed,
-                           "this bounded call contract accepts at most eight register arguments"},
-            0};
+        return {failure, 0};
     }
     if (limits.max_guest_blocks == 0)
     {
@@ -58,10 +72,6 @@ ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
     }
 
     auto* context = thread_state.context();
-    for (std::size_t index = 0; index < arguments.size(); ++index)
-    {
-        context->r[3 + index] = arguments[index];
-    }
     xe::cpu::ppc::GuestExecutionBudget execution_budget{
         limits.max_guest_blocks, xe::cpu::ppc::GuestExecutionExitReason::kNone, 0};
     GuestImportRefusal import_refusal;

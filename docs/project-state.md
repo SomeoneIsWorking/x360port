@@ -29,8 +29,10 @@ static or interpreter product path.
 
 S011 is the current focus. The bounded JIT call and import-refusal contracts now
 include fail-closed translation refusal for invalid and decoded-but-unimplemented
-PPC instructions. Gears has also exercised a nested real-image override call;
-broader service composition, gameplay, and reason-labelled fallback remain open.
+PPC instructions. A bounded Xenia-owned interpreter fallback now executes a narrow
+`lswi`/`blr` leaf and reports refusal counters. Gears has also exercised a nested
+real-image override call; broader service composition, gameplay, and complete fallback
+semantics remain open.
 
 ## Capability details
 
@@ -114,7 +116,7 @@ callee returning 17. `CallOriginal` re-enters the translated body without
 recursion; callee invalidation retains the redirect, a failing native callback
 exits with its typed failure, and removal restores the cached caller's original
 result. The x64 synthetic runtime gate and Clang-Tidy pass at Xenia
-`185b4fc4e0f8e37a40941246060ff589e8aa6db7`. Gears' headless
+`271535bdb35c8ecdb09cd70c3717617971fbfd1e`. Gears' headless
 profile-authenticated AddRef discriminator at `0x82233668` also proves that a
 nested real-image guest call enters the override and returns to the original
 guest path after removal (Gears commit `568b918`).
@@ -137,19 +139,19 @@ exit with `ImportServiceRefused`, preserve library/ordinal identity, increment
 the refusal counter, and permit a subsequent successful call. The import-runtime
 test owns this discriminator. The Xenia x64/A64 post-call guard propagates the
 new exit reason without a separate dispatch path. The synthetic runtime test
-also executes a valid cached PPC leaf beside a primary-opcode-zero invalid
-instruction and decoded `lswi` without an implementation. Both bad functions
-refuse with `TranslationFailed` and neither publishes host bytes or increments
-successful execution; the valid call path remains available afterward. The
+    also executes a valid cached PPC leaf beside a primary-opcode-zero invalid
+    instruction and decoded `lswi` without a JIT implementation. The invalid function
+    refuses through the bounded interpreter without publishing host bytes; the `lswi`
+    leaf executes through it and the test checks fallback entry, instruction, unsupported,
+    memory, and budget counters. The valid call path remains available afterward. The
 pinned Xenia generator returns `kInvalid` on decoder misses, and its HIR builder
 refuses a whole function when an emitter reports missing semantics rather than
 publishing a partial no-op translation.
 
 Gap: cancellation at a safe guest-defined boundary and complete reason-labelled
-interpreter fallback are separate runtime contracts. The pinned Xenia tree has
-no CPU interpreter implementation to reuse (its interpreter files are GPU-shader
-code); the fallback needs an explicitly owned implementation inside Xenia before
-the embedding layer can select or account for it.
+interpreter fallback are separate runtime contracts. The current Xenia interpreter
+is intentionally narrow (`lswi` and `blr` only); complete PPC semantics, safe guest
+control flow, real-image qualification, and title-service behavior remain open.
 
 ### S012 — executable invalidation
 

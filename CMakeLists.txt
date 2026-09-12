@@ -17,7 +17,7 @@ option(X360PORT_VALIDATION_ONLY
        OFF)
 set(X360PORT_XENIA_SOURCE_DIR "" CACHE PATH
     "Path to the pinned Xenia source checkout used by the x360port executor")
-set(X360PORT_XENIA_REVISION "185b4fc4e0f8e37a40941246060ff589e8aa6db7")
+set(X360PORT_XENIA_REVISION "271535bdb35c8ecdb09cd70c3717617971fbfd1e")
 
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp
@@ -47,6 +47,7 @@ set(X360PORT_RUNTIME_SOURCES
     src/executable_invalidation.cpp
     src/guest_execution.cpp
     src/guest_memory.cpp
+    src/interpreter_fallback.cpp
     src/override_dispatch.cpp
     src/runtime.cpp
     src/runtime_errors.cpp
@@ -63,6 +64,7 @@ set(X360PORT_RUNTIME_HEADERS
     src/device_dispatch.hpp
     src/executable_invalidation.hpp
     src/guest_memory.hpp
+    src/interpreter_fallback.hpp
     src/guest_call_frame.hpp
     src/guest_execution.hpp
     src/guest_execution_budget.hpp

@@ -31,6 +31,9 @@ enum class RuntimeError : std::uint8_t
     ModuleRegistrationFailed,
     EntryOutsideCode,
     TranslationFailed,
+    InterpreterFallbackUnsupported,
+    InterpreterFallbackMemoryInvalid,
+    InterpreterFallbackBudgetExceeded,
     ExecutionBudgetInvalid,
     ExecutionBudgetExceeded,
     ExecutionInvalidated,
@@ -98,6 +101,7 @@ struct JitStatistics
 {
     std::uint64_t translated_functions = 0;
     std::uint64_t emitted_host_bytes = 0;
+    std::uint64_t translation_failures = 0;
     std::uint64_t execution_calls = 0;
     std::uint64_t execution_budget_exhaustions = 0;
     std::uint64_t execution_invalidations = 0;
@@ -108,6 +112,11 @@ struct JitStatistics
     std::uint64_t observed_executable_writes = 0;
     std::uint64_t device_read_calls = 0;
     std::uint64_t device_write_calls = 0;
+    std::uint64_t interpreter_fallback_entries = 0;
+    std::uint64_t interpreter_fallback_instructions = 0;
+    std::uint64_t interpreter_fallback_unsupported = 0;
+    std::uint64_t interpreter_fallback_memory_failures = 0;
+    std::uint64_t interpreter_fallback_budget_exhaustions = 0;
 };
 
 struct ExecutionLimits
@@ -116,6 +125,8 @@ struct ExecutionLimits
     // A zero limit is invalid; the default is intentionally finite so a guest
     // path that never returns cannot strand the embedding thread.
     std::uint64_t max_guest_blocks = 1'000'000;
+    // Bounds the fallback when JIT compilation refuses.
+    std::uint64_t max_interpreter_instructions = 100'000;
 };
 
 struct RuntimeCreateResult;

@@ -4,6 +4,7 @@
 #include "executable_invalidation.hpp"
 #include "guest_execution.hpp"
 #include "guest_memory.hpp"
+#include "interpreter_fallback.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
 #include "xenia_backend.hpp"
@@ -335,9 +336,9 @@ class RuntimeContext::Impl final
         if (guest_function == nullptr || guest_function->machine_code() == nullptr ||
             guest_function->machine_code_length() == 0)
         {
-            return {Failure(RuntimeError::TranslationFailed,
-                            "Xenia could not translate the requested guest function"),
-                    0};
+            ++statistics_.translation_failures;
+            return ExecuteInterpreterFallback(*processor_, *thread_state_, address, arguments,
+                                              limits, statistics_);
         }
 
         if (!had_machine_code)
