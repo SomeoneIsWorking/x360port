@@ -53,6 +53,7 @@ set(X360PORT_RUNTIME_SOURCES
     src/runtime_imports.cpp
     src/xenia_backend.cpp
     src/xex_helpers.cpp
+    src/xex_imports.cpp
     src/xex_inspect.cpp
 )
 set(X360PORT_RUNTIME_HEADERS
@@ -67,6 +68,7 @@ set(X360PORT_RUNTIME_HEADERS
     src/runtime_imports.hpp
     src/xenia_backend.hpp
     src/xex_helpers.hpp
+    src/xex_imports.hpp
     include/x360port/xex_inspect.hpp
 )
 
@@ -211,6 +213,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                     tests/xex_inspect_tests.cpp
                     src/xenia_backend.cpp
                     src/xex_helpers.cpp
+                    src/xex_imports.cpp
                     src/xex_inspect.cpp
                     tools/xex_inspect.cpp
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

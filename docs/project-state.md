@@ -218,6 +218,9 @@ Evidence: `x360-xex-inspect` validates XEX2 header, security geometry, file-form
 and payload bounds before entering Xenia, then uses the pinned Xenia loader's
 decryption/decompression path, canonicalizes import records and function stubs,
 maps the PE, and reports execution metadata, ordered logical imports, and the
+correctly indexed import-library names. The string-table parser follows the XEX
+library-index and alignment contract, so multiple library records remain distinct
+(`xam.xex` versus `xboxkrnl.exe`) instead of treating the index as a byte offset.
 eight register save/restore helper scans. The real ignored Gears 1 XEX produces
 the existing checked authority's 13,500,416-byte image with SHA-256
 `f61cc78e4057bc68a2c65386a0341f6d26a7add3dfd9918007a455750ec6ed5c`, 17
