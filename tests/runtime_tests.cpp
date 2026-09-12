@@ -18,6 +18,8 @@ using namespace x360port;
 constexpr GuestAddress kCodeAddress = 0x82000000;
 constexpr GuestAddress kSelfModifyingAddress = kCodeAddress + 48;
 constexpr GuestAddress kInternalCallerAddress = kCodeAddress + 80;
+constexpr GuestAddress kNonReturningAddress = kCodeAddress + 108;
+constexpr GuestAddress kNonReturningCallerAddress = kCodeAddress + 112;
 constexpr GuestAddress kDeviceReadAddress = kCodeAddress + 8;
 constexpr GuestAddress kDeviceWriteAddress = kCodeAddress + 24;
 constexpr std::uint32_t kDeviceAddress = 0xC0001000;
@@ -84,6 +86,9 @@ class TestModule final : public GuestModule
                           0x38, 0x60, 0x00, 0x11, // li r3, 17
                           0x4E, 0x80, 0x00, 0x20, // blr
                       });
+        CopyBytes(108, {0x48, 0x00, 0x00, 0x00}); // b .
+        CopyBytes(112, {0x48, 0x00, 0x00, 0x09}); // bl +8, to the nested leaf
+        CopyBytes(120, {0x48, 0x00, 0x00, 0x00}); // b .
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -116,7 +121,7 @@ class TestModule final : public GuestModule
         }
     }
 
-    std::array<std::byte, 108> image_{};
+    std::array<std::byte, 124> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -327,6 +332,25 @@ int main()
     Require(created.context->Statistics().translated_functions == translations_after_internal_call,
             "the cached internal guest call translated again");
 
+    ExecutionResult invalid_budget = created.context->Execute(kCodeAddress, {}, ExecutionLimits{0});
+    Require(!invalid_budget, "a zero guest execution budget was accepted");
+    Require(invalid_budget.failure.error == RuntimeError::ExecutionBudgetInvalid,
+            "the invalid guest execution budget did not report its typed reason");
+
+    ExecutionResult non_returning =
+        created.context->Execute(kNonReturningAddress, {}, ExecutionLimits{2});
+    Require(!non_returning, "a non-returning guest block escaped its execution budget");
+    Require(non_returning.failure.error == RuntimeError::ExecutionBudgetExceeded,
+            "the bounded guest exit did not report its typed reason");
+    Require(created.context->Statistics().execution_budget_exhaustions == 1,
+            "the bounded guest exit was not counted");
+    non_returning = created.context->Execute(kNonReturningCallerAddress, {}, ExecutionLimits{2});
+    Require(!non_returning, "a nested non-returning guest call escaped its budget");
+    Require(non_returning.failure.error == RuntimeError::ExecutionBudgetExceeded,
+            "nested bounded guest exit did not propagate its typed reason");
+    Require(created.context->Statistics().execution_budget_exhaustions == 2,
+            "the nested bounded guest exit was not counted");
+
     ExecutionResult self_modifying = created.context->Execute(kSelfModifyingAddress);
     Require(static_cast<bool>(self_modifying), self_modifying.failure.detail);
     Require(self_modifying.value == 9,
@@ -401,7 +425,7 @@ int main()
 
     const std::uint64_t translations_before_invalidation =
         recreated.context->Statistics().translated_functions;
-    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 107, 2);
+    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 123, 2);
     Require(loaded.error == RuntimeError::ExecutableRangeInvalid,
             "an executable write outside the authenticated code range was accepted");
     loaded = recreated.context->NotifyExecutableWrite(kDeviceReadAddress, 4);

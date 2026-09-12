@@ -10,7 +10,9 @@ The executable slice is a bounded, single-instance Xenia context owning
 image and import manifest before committing guest memory, maps one raw image at
 its authenticated address, binds typed function and variable imports through
 Xenia's production export machinery, translates PPC on demand with Xenia's host
-dynarec, and calls the cached host code. The runtime test executes a real PPC
+dynarec, and calls the cached host code. Every translated public guest
+execution has a finite basic-block budget and propagates exhaustion across
+nested guest calls as a typed failure. The runtime test executes a real PPC
 leaf plus guest calls and loads through both import kinds, and requires nonzero
 emitted host code.
 
@@ -41,7 +43,7 @@ inspection plus the canonical normalized image when requested with
 or provide a gameplay fallback.
 
 The required Xenia revision is
-`05367a167681e4c1b75921372ff7079e51a7b069` from the maintained
+`f024c152d8200bfe5a0f3db11e4fdcd4cd95cca5` from the maintained
 `SomeoneIsWorking/xenia-canary` `main` branch; configuration refuses any other
 revision. `-DX360PORT_VALIDATION_ONLY=ON` builds only the synthetic diagnostic
 validator and never claims runtime capability.

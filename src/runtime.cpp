@@ -2,7 +2,7 @@
 
 #include "device_dispatch.hpp"
 #include "executable_invalidation.hpp"
-#include "guest_call_frame.hpp"
+#include "guest_execution.hpp"
 #include "guest_memory.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
@@ -16,7 +16,6 @@
 #include <utility>
 
 #include "xenia/cpu/function.h"
-#include "xenia/cpu/ppc/ppc_context.h"
 #include "xenia/cpu/processor.h"
 #include "xenia/cpu/raw_module.h"
 #include "xenia/cpu/thread_state.h"
@@ -30,8 +29,6 @@ namespace
 constexpr std::uint32_t kThreadId = 0x360;
 constexpr std::uint32_t kStackSize = 64 * 1024;
 constexpr std::uint32_t kPcrSize = 0x1000;
-constexpr std::uint32_t kReturnAddress = 0xBCBCBCBC;
-constexpr std::size_t kRegisterArgumentCount = 8;
 
 std::mutex g_instance_mutex;
 bool g_instance_active = false;
@@ -292,25 +289,28 @@ class RuntimeContext::Impl final
     }
 
     [[nodiscard]] ExecutionResult Execute(RuntimeContext& owner, GuestAddress address,
-                                          std::span<const std::uint64_t> arguments)
+                                          std::span<const std::uint64_t> arguments,
+                                          ExecutionLimits limits)
     {
         if (const auto override = overrides_.Find(address); override.has_value())
         {
             ++statistics_.native_override_calls;
             return override->handler(owner, address, arguments, override->context);
         }
-        return ExecuteOriginal(address, arguments);
+        return ExecuteOriginal(address, arguments, limits);
     }
 
     [[nodiscard]] ExecutionResult CallOriginal(GuestAddress address,
-                                               std::span<const std::uint64_t> arguments)
+                                               std::span<const std::uint64_t> arguments,
+                                               ExecutionLimits limits)
     {
         ++statistics_.original_calls;
-        return ExecuteOriginal(address, arguments);
+        return ExecuteOriginal(address, arguments, limits);
     }
 
     [[nodiscard]] ExecutionResult ExecuteOriginal(GuestAddress address,
-                                                  std::span<const std::uint64_t> arguments)
+                                                  std::span<const std::uint64_t> arguments,
+                                                  ExecutionLimits limits)
     {
         if (invalidation_ != nullptr)
         {
@@ -325,13 +325,6 @@ class RuntimeContext::Impl final
                             "guest entry is outside the authenticated executable range"),
                     0};
         }
-        if (arguments.size() > kRegisterArgumentCount)
-        {
-            return {Failure(RuntimeError::ExecutionFailed,
-                            "this bounded call contract accepts at most eight register arguments"),
-                    0};
-        }
-
         const auto* cached_guest_function =
             dynamic_cast<xe::cpu::GuestFunction*>(processor_->QueryFunction(address));
         const bool had_machine_code = cached_guest_function != nullptr &&
@@ -353,22 +346,16 @@ class RuntimeContext::Impl final
             statistics_.emitted_host_bytes += guest_function->machine_code_length();
         }
 
-        auto* context = thread_state_->context();
-        for (std::size_t index = 0; index < arguments.size(); ++index)
+        ExecutionResult result = ExecuteGuestFunction(*function, *thread_state_, arguments, limits);
+        if (result.failure.error == RuntimeError::ExecutionBudgetExceeded)
         {
-            context->r[3 + index] = arguments[index];
+            ++statistics_.execution_budget_exhaustions;
         }
-        const GuestCallFrame call_frame(*context, kReturnAddress);
-        const bool executed = function->Call(thread_state_.get(), kReturnAddress);
-        if (!executed)
+        if (result)
         {
-            return {Failure(RuntimeError::ExecutionFailed,
-                            "Xenia's translated guest function refused execution"),
-                    0};
+            ++statistics_.execution_calls;
         }
-
-        ++statistics_.execution_calls;
-        return {{}, context->r[3]};
+        return result;
     }
 
     [[nodiscard]] const JitStatistics& Statistics() const noexcept { return statistics_; }
@@ -472,15 +459,17 @@ RuntimeFailure RuntimeContext::NotifyExecutableWrite(GuestAddress address, std::
 }
 
 ExecutionResult RuntimeContext::Execute(GuestAddress address,
-                                        std::span<const std::uint64_t> arguments)
+                                        std::span<const std::uint64_t> arguments,
+                                        ExecutionLimits limits)
 {
-    return impl_->Execute(*this, address, arguments);
+    return impl_->Execute(*this, address, arguments, limits);
 }
 
 ExecutionResult RuntimeContext::CallOriginal(GuestAddress address,
-                                             std::span<const std::uint64_t> arguments)
+                                             std::span<const std::uint64_t> arguments,
+                                             ExecutionLimits limits)
 {
-    return impl_->CallOriginal(address, arguments);
+    return impl_->CallOriginal(address, arguments, limits);
 }
 
 const JitStatistics& RuntimeContext::Statistics() const noexcept { return impl_->Statistics(); }

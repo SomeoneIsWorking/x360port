@@ -120,8 +120,14 @@ translations.
 
 Evidence: entry addresses are constrained to authenticated code, the call ABI
 accepts at most eight register arguments, and LR/SP are restored through an
-exception-safe call frame. Gap: a runtime-owned execution budget or
-cancellation/exit contract for guest code that does not return.
+exception-safe call frame. `ExecutionLimits` now installs a finite translated
+basic-block budget in the Xenia PPC context; x64 and A64 emitters decrement it
+at every basic-block entry and propagate exhaustion across nested guest calls.
+The runtime test proves both typed rejection of a zero limit and a non-returning
+synthetic guest loop that exits with `ExecutionBudgetExceeded` and increments
+the exhaustion counter. Remaining gap: cancellation at a safe guest-defined
+boundary and complete reason-labelled interpreter fallback are separate
+runtime contracts.
 
 ### S012 — executable invalidation
 
