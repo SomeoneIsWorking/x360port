@@ -18,6 +18,7 @@ using namespace x360port;
 constexpr GuestAddress kCodeAddress = 0x82000000;
 constexpr GuestAddress kSelfModifyingAddress = kCodeAddress + 48;
 constexpr GuestAddress kInternalCallerAddress = kCodeAddress + 80;
+constexpr GuestAddress kInvalidatedCallerAddress = kCodeAddress + 160;
 constexpr GuestAddress kNonReturningAddress = kCodeAddress + 108;
 constexpr GuestAddress kNonReturningCallerAddress = kCodeAddress + 112;
 constexpr GuestAddress kMidCallInvalidationAddress = kCodeAddress + 128;
@@ -40,6 +41,7 @@ class TestModule final : public GuestModule
         CopyWords(120, {0x48000000}); // b .
         CopyWords(128, {0x3C608200, 0x60630098, 0x3C804E80, 0x60840020, 0x90830000, 0x7C6903A6,
                         0x4E800420});
+        CopyWords(160, {0x7C0802A6, 0x4BFFFF5D, 0x7C0803A6, 0x4E800020});
         descriptor_.image.sha256 = HashBytes(image_);
         descriptor_.image.base = kCodeAddress;
         descriptor_.image.size = static_cast<std::uint32_t>(image_.size());
@@ -73,7 +75,7 @@ class TestModule final : public GuestModule
         }
     }
 
-    std::array<std::byte, 156> image_{};
+    std::array<std::byte, 176> image_{};
     ModuleDescriptor descriptor_{};
 };
 
@@ -194,6 +196,10 @@ int main()
     Require(created.context->Statistics().translated_functions == translations_after_internal_call,
             "the cached internal guest call translated again");
 
+    ExecutionResult invalidated_caller = created.context->Execute(kInvalidatedCallerAddress);
+    Require(static_cast<bool>(invalidated_caller) && invalidated_caller.value == 42,
+            "the caller of the original leaf did not return its value");
+
     ExecutionResult invalid_budget = created.context->Execute(kCodeAddress, {}, ExecutionLimits{0});
     Require(!invalid_budget, "a zero guest execution budget was accepted");
     Require(invalid_budget.failure.error == RuntimeError::ExecutionBudgetInvalid,
@@ -232,6 +238,9 @@ int main()
             "the self-modifying guest write was not counted");
     Require(created.context->Statistics().observed_executable_writes != 0,
             "Xenia did not observe the guest executable write");
+    ExecutionResult caller_after_write = created.context->Execute(kInvalidatedCallerAddress);
+    Require(static_cast<bool>(caller_after_write) && caller_after_write.value == 43,
+            "a cached guest caller reused the pre-invalidation callee body");
     ExecutionResult automatically_invalidated = created.context->Execute(kCodeAddress);
     Require(static_cast<bool>(automatically_invalidated), automatically_invalidated.failure.detail);
     Require(automatically_invalidated.value == 43,
@@ -300,7 +309,8 @@ int main()
 
     const std::uint64_t translations_before_invalidation =
         recreated.context->Statistics().translated_functions;
-    loaded = recreated.context->NotifyExecutableWrite(kCodeAddress + 155, 2);
+    loaded = recreated.context->NotifyExecutableWrite(
+        kCodeAddress + module.Descriptor().code.size - 1U, 2);
     Require(loaded.error == RuntimeError::ExecutableRangeInvalid,
             "an executable write outside the authenticated code range was accepted");
     loaded = recreated.context->NotifyExecutableWrite(kDeviceReadAddress, 4);

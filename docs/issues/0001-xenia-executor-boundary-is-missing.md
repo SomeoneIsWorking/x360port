@@ -51,13 +51,13 @@ with `a newly translated guest caller did not use the native override`.
 The probe was removed after measurement; the shipping test suite remains green
 but does not prove internal override dispatch.
 
-`RuntimeContext::Execute` alone checks `OverrideDispatch::Find`; Xenia's direct
-and indirect translated calls use its own `GuestFunction` machine-code and
-code-cache paths. Invalidating only the callee entry cannot redirect those
-calls. The correction belongs at Xenia's guest-call/translation boundary,
-with an image-scoped native entry, full PPC/guest-memory ABI, a separately
-callable original body, and coherent install/remove behavior for already
-translated direct and indirect callers. A host-entry-only wrapper is not a
+`RuntimeContext::Execute` alone checks `OverrideDispatch::Find`; translated
+guest calls use Xenia's code-cache path. The pinned fork now routes both direct
+and indirect calls through guest-address indirection entries and resets an
+invalidated entry to the resolve thunk. The remaining correction is for
+`x360port` to install an image-scoped native target into that entry, expose the
+full PPC/guest-memory ABI, preserve a separately callable original body, and
+restore the ordinary target on removal. A host-entry-only wrapper is not a
 native game override.
 
 ## Resolution condition

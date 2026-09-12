@@ -27,12 +27,12 @@ static or interpreter product path.
 
 ## Current focus
 
-S016 is the current focus. The real `x360port` target binds the platform XAM
-controller state and capabilities exports through Xenia's typed import path and
-consumes title-supplied device data. Its synthetic production-boundary test
-covers exact guest bytes, connection status, null-pointer behavior, and refusal
-of invalid guest memory. Broader real-image service composition, gameplay, and
-reason-labelled fallback remain open.
+S010 is the current focus. Xenia now routes compiled guest calls through
+invalidatable guest-address entries, including a caller cached before a callee's
+executable write. The remaining native-override work is to redirect those
+entries to title-owned handlers and preserve scoped original calls. Broader
+real-image service composition, gameplay, and reason-labelled fallback remain
+open.
 
 ## Capability details
 
@@ -117,9 +117,9 @@ Gap: this is only the public entry-dispatch contract. A focused synthetic
 falsifier installed an override at a guest callee returning 17: direct host
 entry returned the wrapped value 18, but an already-translated guest caller
 still returned 17 and a caller translated after installation did not return
-the wrapped value 18. Internal
-guest calls do not consult the override table. The production fix must route
-direct and indirect translated calls through an image-scoped native entry while
+the wrapped value 18. Internal guest calls do not consult the override table.
+The production fix must redirect Xenia's direct and indirect call entries to an
+image-scoped native target while
 preserving a separately callable original body, its PPC state, and coherent
 install/remove invalidation. Real Gears-image call paths remain unqualified.
 
@@ -156,7 +156,13 @@ call immediately after the guest store, then drains the coalesced range at the
 next guest-call boundary and re-translates modified guest bytes. The runtime test
 proves the typed `ExecutionInvalidated` result for a mid-call self-modifying
 function, proves the following call can dispatch after invalidation, and retains
-the existing changed-return-value and unrelated-translation checks.
+the existing changed-return-value and unrelated-translation checks. The pinned
+Xenia fork routes x64 and A64 compiled direct calls through its guest-address
+indirection table and resets an invalidated callee's slot to the resolve thunk.
+The synthetic runtime now primes a cached caller against a leaf returning 42,
+changes the leaf through guest code, and observes 43 through the same cached
+caller before a direct host entry refreshes the leaf. This is x64 local evidence;
+A64 execution remains unqualified.
 
 Gap: title-specific write paths and complete cache-control semantics still need
 real-image evidence.
