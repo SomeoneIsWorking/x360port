@@ -12,7 +12,7 @@ static or interpreter product path.
 | S002 | Typed import manifest/binding validator is synthetically falsified | verified | — | G002 |
 | S003 | Xenia runtime objects have one bounded embedding context | verified | — | G001 |
 | S004 | Retained validators execute against Xenia `RawModule` | verified | S001, S002, S003 | G001, G002 |
-| S005 | Gears leaf/import/override discriminator executes through Xenia | missing | S003, S004 | G001 |
+| S005 | Gears leaf/import/override discriminator executes through Xenia | partial | S003, S004 | G001 |
 | S006 | Xenia A64 execution is qualified on Apple Silicon macOS | missing | S003, S004 | G001 |
 | S007 | Xenia A64 execution is qualified on Android arm64-v8a | missing | S003, S004 | G001 |
 | S008 | Typed function and variable imports execute through Xenia exports | verified | S002, S003, S004 | G001, G002 |
@@ -27,10 +27,9 @@ static or interpreter product path.
 
 ## Current focus
 
-S010 is the current focus. Xenia now routes compiled guest calls through
-invalidatable guest-address entries and can redirect a cached caller to a
-title-owned native handler while preserving a separately callable original.
-The synthetic contract is verified on x64; real Gears-image override paths,
+S011 is the current focus. The bounded JIT call and import-refusal contracts now
+include fail-closed translation refusal for invalid and decoded-but-unimplemented
+PPC instructions. Gears has also exercised a nested real-image override call;
 broader service composition, gameplay, and reason-labelled fallback remain open.
 
 ## Capability details
@@ -66,8 +65,11 @@ unresolvable variable import fail before guest memory is committed.
 
 ### S005 — Gears discriminator
 
-Missing capability: execute the authenticated Gears leaf/import/override
-round-trip through Xenia with nonzero dynarec work and no interpreter link.
+Evidence: Gears commit `568b918` runs the profile-authenticated real-image
+AddRef leaf through Xenia with host-entry, nested guest-call, and scoped-original
+override/removal paths. Its synthetic Gears-addressed discriminator crosses a
+typed `DbgPrint` import. Gap: the real-image path has not yet exercised a
+`DbgPrint` callback or complete title services; neither leaf proves gameplay.
 
 ### S006 — Apple Silicon macOS
 
@@ -112,11 +114,13 @@ callee returning 17. `CallOriginal` re-enters the translated body without
 recursion; callee invalidation retains the redirect, a failing native callback
 exits with its typed failure, and removal restores the cached caller's original
 result. The x64 synthetic runtime gate and Clang-Tidy pass at Xenia
-`7730acfce1801bbe340c0ccd79d24c7252a22a98`.
+`185b4fc4e0f8e37a40941246060ff589e8aa6db7`. Gears' headless
+profile-authenticated AddRef discriminator at `0x82233668` also proves that a
+nested real-image guest call enters the override and returns to the original
+guest path after removal (Gears commit `568b918`).
 
-Gap: real Gears-image native override entry, original-call, and removal paths
-remain unqualified. The current test exercises a cached direct guest call; an
-indirect guest call and A64 backend still need their own runtime discriminators.
+Gap: the current shared test exercises a cached direct guest call; an indirect
+guest call and A64 backend still need their own runtime discriminators.
 
 ### S011 — bounded calls
 
@@ -132,7 +136,14 @@ silently return; both direct import-thunk entry and a translated guest caller
 exit with `ImportServiceRefused`, preserve library/ordinal identity, increment
 the refusal counter, and permit a subsequent successful call. The import-runtime
 test owns this discriminator. The Xenia x64/A64 post-call guard propagates the
-new exit reason without a separate dispatch path.
+new exit reason without a separate dispatch path. The synthetic runtime test
+also executes a valid cached PPC leaf beside a primary-opcode-zero invalid
+instruction and decoded `lswi` without an implementation. Both bad functions
+refuse with `TranslationFailed` and neither publishes host bytes or increments
+successful execution; the valid call path remains available afterward. The
+pinned Xenia generator returns `kInvalid` on decoder misses, and its HIR builder
+refuses a whole function when an emitter reports missing semantics rather than
+publishing a partial no-op translation.
 
 Gap: cancellation at a safe guest-defined boundary and complete reason-labelled
 interpreter fallback are separate runtime contracts. The pinned Xenia tree has
@@ -217,7 +228,7 @@ Local evidence: the combined Clang build compiles all 240 affected steps, 10/10
 Python tests pass, and 23/25 CTests pass initially. The two fatal probes expose a
 test-discovery newline mismatch in Xenia's console entry; after correcting only
 that parser boundary, both shipping-executable probes and the harness controls
-pass (3/3 focused CTests). All 25 registered checks are covered. A subsequent
+pass (3/3 focused CTests). All 27 current registered checks pass locally. A subsequent
 reconfigure/build performs zero compilations. Existing untouched upstream lint
 findings remain; this is not a warning-clean whole-Xenia claim.
 

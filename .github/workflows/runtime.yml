@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  XENIA_REVISION: 9cddd1759f96b0491bfcd933a73ca7eaab1f258b
+  XENIA_REVISION: 185b4fc4e0f8e37a40941246060ff589e8aa6db7
 
 jobs:
   native-runtime:
