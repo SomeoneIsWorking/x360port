@@ -16,13 +16,16 @@ constexpr ImportKind kFunction = ImportKind::Function;
 constexpr ImportKind kVariable = ImportKind::Variable;
 
 #define XE_EXPORT(module, ordinal, name, kind)                                                     \
-    ExportNames::Export { (ordinal), #name, (kind) }
+    ExportNames::Export { #name, (ordinal), (kind) }
 
-constexpr std::array kKernelExports{
+// Built-in arrays rather than std::array: class-template argument deduction
+// folds one expression per element, and these tables exceed the 256-term
+// nesting limit some supported toolchains enforce.
+constexpr ExportNames::Export kKernelExports[]{
 #include "xenia/kernel/xboxkrnl/xboxkrnl_table.inc"
 };
 
-constexpr std::array kXamExports{
+constexpr ExportNames::Export kXamExports[]{
 #include "xenia/kernel/xam/xam_table.inc"
 };
 
