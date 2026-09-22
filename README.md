@@ -5,7 +5,17 @@ Xenon decoding, its x64/A64 dynamic recompilers, executable memory, guest
 memory, and translated-block caching. This package owns only the narrow
 embedding contracts shared by title ports.
 
-The executable slice is a bounded, single-instance Xenia context owning
+It has two execution owners. `SystemSession` (`x360port::system`) is the
+product: Xenia's complete console (kernel and XAM services, file system, audio,
+GPU, input, and its guest thread scheduler) composed around one authenticated
+title, with the title's native overrides installed before its first
+instruction runs. `RunWindowedSystem` hosts it in a game window;
+`SystemSession::CreateOffscreen` gives maintainer tools a headless, silent
+session whose output they can capture. `RuntimeContext` is the isolated leaf
+harness in which overrides and services are qualified. Both hand an override
+the same `GuestCallContext`, so a title writes each override once.
+
+The leaf harness is a bounded, single-instance Xenia context owning
 `Memory`, `Processor`, `ThreadState`, and `RawModule`. It validates an exact
 image and import manifest before committing guest memory, maps one raw image at
 its authenticated address, binds typed function and variable imports through

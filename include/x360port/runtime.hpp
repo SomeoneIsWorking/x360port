@@ -1,6 +1,7 @@
 #ifndef X360PORT_RUNTIME_HPP
 #define X360PORT_RUNTIME_HPP
 
+#include "x360port/guest_call.hpp"
 #include "x360port/import_claims.hpp"
 #include "x360port/module_contract.hpp"
 #include "x360port/runtime_failure.hpp"
@@ -34,20 +35,6 @@ struct GuestMemoryAllocationResult
         return static_cast<bool>(allocation) && !failure;
     }
 };
-
-class RuntimeContext;
-
-struct ExecutionResult
-{
-    RuntimeFailure failure;
-    std::uint64_t value = 0;
-
-    [[nodiscard]] explicit operator bool() const noexcept { return !failure; }
-};
-
-using NativeOverrideHandler = ExecutionResult (*)(RuntimeContext& runtime, GuestAddress address,
-                                                  std::span<const std::uint64_t> arguments,
-                                                  void* context) noexcept;
 
 using DeviceReadCallback = std::uint32_t (*)(std::uint32_t address, void* context) noexcept;
 using DeviceWriteCallback = void (*)(std::uint32_t address, std::uint32_t value,
@@ -90,7 +77,7 @@ struct ExecutionLimits
 
 struct RuntimeCreateResult;
 
-class RuntimeContext final
+class RuntimeContext final : public GuestCallContext
 {
   public:
     RuntimeContext(const RuntimeContext&) = delete;
@@ -111,9 +98,9 @@ class RuntimeContext final
     // they still require one committed, accessible guest range and reject
     // device mappings.
     [[nodiscard]] RuntimeFailure ReadMappedGuestMemory(GuestAddress address,
-                                                       std::span<std::byte> bytes) const;
+                                                       std::span<std::byte> bytes) const override;
     [[nodiscard]] RuntimeFailure WriteMappedGuestMemory(GuestAddress address,
-                                                        std::span<const std::byte> bytes);
+                                                        std::span<const std::byte> bytes) override;
     [[nodiscard]] RuntimeFailure ReleaseGuestMemory(GuestMemoryAllocation allocation);
 
     // The kernel exports x360port implements over its own embedded Xenia
@@ -142,6 +129,9 @@ class RuntimeContext final
     [[nodiscard]] ExecutionResult CallOriginal(GuestAddress address,
                                                std::span<const std::uint64_t> arguments = {},
                                                ExecutionLimits limits = {});
+    // The override-side original call: the same scoped entry with default limits.
+    [[nodiscard]] ExecutionResult
+    CallOriginalBody(GuestAddress address, std::span<const std::uint64_t> arguments) override;
 
     [[nodiscard]] const JitStatistics& Statistics() const noexcept;
 

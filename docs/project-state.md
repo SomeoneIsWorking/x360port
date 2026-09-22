@@ -26,17 +26,18 @@ static or interpreter product path.
 | S016 | XAM controller state/capabilities imports use title-supplied device data | verified | S008, S011 | G001 |
 | S017 | Host services claim kernel/XAM imports by exported name | verified | S002, S008 | G001, G002 |
 | S018 | Kernel virtual-memory exports run over the embedded Xenia heaps | verified | S008, S017 | G001 |
+| S019 | A full-system session runs a title on Xenia's kernel, file system, audio, GPU, and input with native overrides | partial | S010, S013, S016 | G001 |
 
 ## Current focus
 
-S018 is complete and S011 remains the current focus. The bounded JIT call and import-refusal contracts now
-include fail-closed translation refusal for invalid and decoded-but-unimplemented
-PPC instructions. A bounded Xenia-owned interpreter fallback now executes a narrow
-integer, scalar-memory, comparison, and branch subset around `lswi`/`blr` and reports
-refusal counters. Gears has also exercised a nested real-image override call; broader
-service composition now begins with the kernel's virtual-memory exports, which run
-over the same Xenia heaps the embedded processor uses; gameplay and complete fallback
-semantics remain open.
+S019 is the current focus. The consuming titles need a product that plays, not only an
+isolated leaf harness, so x360port now composes Xenia's complete console (kernel and XAM
+services, VFS, APU, GPU, HID, and its multi-threaded guest scheduler) around one title
+through `SystemSession`. Native overrides, their scoped original calls, and the title's
+controller arbitration attach to that console through the same `GuestCallContext`
+boundary that `RuntimeContext` provides for leaf qualification. The single-thread service
+reimplementations (S018 and the earlier critical-section work) are not extended further:
+Xenia's kernel owns those semantics in the product.
 
 ## Capability details
 
@@ -322,3 +323,21 @@ were confirmed to fail when the service is mutated to the opposite behaviour.
 The guest ABI constants the test drives are restated from the console's documented
 values rather than read from the header the service uses, so a wrong constant fails
 instead of agreeing with itself.
+
+### S019 — full-system session
+
+Evidence: `x360port_system` composes `xe::Emulator` with the Xenia x64 dynarec, the
+Vulkan graphics system, the SDL audio system (a dummy device whose cursors still advance
+when silent), and a title-supplied `hid::InputDriver` over `XamPadReader`/
+`XamCapabilitiesReader`. Overrides install in Xenia's `on_launch` callback, after the
+module maps and before its main thread resumes, bounded to the module's `.text` range;
+an identity mismatch or a refused override holds the main thread so the title never runs.
+`x360port_system_config_tests` requires each of six invalid configurations (zero title
+ID, missing title path, relative storage root, either null controller reader, a null
+override handler) to refuse with its typed error before any Xenia owner is composed.
+`RunWindowedSystem` hosts the session in a GTK window with fullscreen toggles.
+
+Gaps: the windowed host exists only for Linux/GTK; the Windows and macOS hosts, and a
+real-title qualification (it comes from a consuming title's headless run), remain. Xenia
+cannot tear down a running title, so a launched session ends only through
+`SystemSession::EndProcess`.

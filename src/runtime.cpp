@@ -12,13 +12,13 @@
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
 #include "xenia_backend.hpp"
+#include "xenia_instance_lease.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cstring>
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <utility>
 
@@ -31,9 +31,6 @@ namespace x360port
 {
 namespace
 {
-
-std::mutex g_instance_mutex;
-bool g_instance_active = false;
 
 [[nodiscard]] RuntimeFailure Failure(RuntimeError error, std::string detail)
 {
@@ -68,26 +65,15 @@ class RuntimeContext::Impl final
         guest_memory_.Reset();
         invalidation_.reset();
         memory_.reset();
-
-        if (owns_instance_)
-        {
-            const std::scoped_lock lock(g_instance_mutex);
-            g_instance_active = false;
-        }
     }
 
     [[nodiscard]] RuntimeFailure Initialize()
     {
+        if (!instance_.Acquire())
         {
-            const std::scoped_lock lock(g_instance_mutex);
-            if (g_instance_active)
-            {
-                return Failure(RuntimeError::InstanceAlreadyActive,
-                               "Xenia guest memory uses a process-wide fixed mapping; only one "
-                               "x360port RuntimeContext may be active");
-            }
-            g_instance_active = true;
-            owns_instance_ = true;
+            return Failure(RuntimeError::InstanceAlreadyActive,
+                           "Xenia guest memory uses a process-wide fixed mapping; only one "
+                           "x360port runtime or system session may be active");
         }
 
         memory_ = std::make_unique<xe::Memory>();
@@ -360,7 +346,8 @@ class RuntimeContext::Impl final
                    static_cast<std::uint64_t>(code_range_.base) + code_range_.size;
     }
 
-    bool owns_instance_ = false;
+    // Declared first so it is released last, after every Xenia owner below.
+    XeniaInstanceLease instance_;
     bool load_failed_ = false;
     std::unique_ptr<xe::Memory> memory_;
     GuestMemory guest_memory_;
@@ -476,6 +463,12 @@ ExecutionResult RuntimeContext::CallOriginal(GuestAddress address,
                                              ExecutionLimits limits)
 {
     return impl_->CallOriginal(address, arguments, limits);
+}
+
+ExecutionResult RuntimeContext::CallOriginalBody(GuestAddress address,
+                                                 std::span<const std::uint64_t> arguments)
+{
+    return impl_->CallOriginal(address, arguments, ExecutionLimits{});
 }
 
 const JitStatistics& RuntimeContext::Statistics() const noexcept { return impl_->Statistics(); }

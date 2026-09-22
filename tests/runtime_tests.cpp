@@ -45,12 +45,12 @@ constexpr auto DeviceWrite = [](const auto address, const auto value, void* cont
     observations.last_write_value = value;
 };
 
-ExecutionResult AddOneThroughOriginal(RuntimeContext& runtime, GuestAddress address,
+ExecutionResult AddOneThroughOriginal(GuestCallContext& call, GuestAddress address,
                                       std::span<const std::uint64_t> arguments,
                                       void* context) noexcept
 {
     ++static_cast<OverrideObservations*>(context)->calls;
-    ExecutionResult original = runtime.CallOriginal(address, arguments);
+    ExecutionResult original = call.CallOriginalBody(address, arguments);
     if (original)
     {
         ++original.value;
@@ -58,7 +58,7 @@ ExecutionResult AddOneThroughOriginal(RuntimeContext& runtime, GuestAddress addr
     return original;
 }
 
-ExecutionResult RefuseOverride(RuntimeContext&, GuestAddress, std::span<const std::uint64_t>,
+ExecutionResult RefuseOverride(GuestCallContext&, GuestAddress, std::span<const std::uint64_t>,
                                void*) noexcept
 {
     return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};

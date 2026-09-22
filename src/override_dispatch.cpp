@@ -3,6 +3,7 @@
 #include "guest_execution_budget.hpp"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <exception>
 #include <utility>
@@ -28,12 +29,14 @@ namespace
 
 } // namespace
 
-void OverrideDispatch::Bind(xe::cpu::Processor& processor, RuntimeContext& owner,
-                            JitStatistics& statistics) noexcept
+void OverrideDispatch::Bind(xe::cpu::Processor& processor, GuestCallContext& owner,
+                            JitStatistics& statistics,
+                            UnscopedFailureSink unscoped_failure) noexcept
 {
     processor_ = &processor;
     owner_ = &owner;
     statistics_ = &statistics;
+    unscoped_failure_ = unscoped_failure;
 }
 
 RuntimeFailure OverrideDispatch::Install(GuestAddress address, NativeOverrideHandler handler,
@@ -99,11 +102,17 @@ void OverrideDispatch::DispatchGuest(xe::cpu::ppc::PPCContext_s* context, void* 
     {
         arguments[index] = context->r[3U + index];
     }
-    ++self.statistics_->native_override_calls;
+    // Any guest thread of a full system may enter an override concurrently.
+    std::atomic_ref<std::uint64_t>(self.statistics_->native_override_calls)
+        .fetch_add(1U, std::memory_order_relaxed);
     ExecutionResult result = entry.handler(*self.owner_, entry.address, arguments, entry.context);
     if (result)
     {
         context->r[3] = result.value;
+    }
+    else if (active_guest_execution_budget == nullptr && self.unscoped_failure_ != nullptr)
+    {
+        self.unscoped_failure_(result.failure);
     }
     else
     {
