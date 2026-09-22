@@ -22,7 +22,7 @@ static or interpreter product path.
 | S012 | Executable writes invalidate Xenia translations coherently | partial | S003, S004 | G001 |
 | S013 | Xenia x64 dynarec executes authenticated PPC and reuses host code | verified | S003, S004 | G001 |
 | S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
-| S015 | Checked XEX2 inspection and canonical normalized-image output | verified | S001, S002, S003, S004 | G001, G002 |
+| S015 | Checked XEX2 inspection and loaded-image output | verified | S001, S002, S003, S004 | G001, G002 |
 | S016 | XAM controller state/capabilities imports use title-supplied device data | verified | S008, S011 | G001 |
 | S017 | Host services claim kernel/XAM imports by exported name | verified | S002, S008 | G001, G002 |
 | S018 | Kernel virtual-memory exports run over the embedded Xenia heaps | verified | S008, S017 | G001 |
@@ -44,11 +44,16 @@ Xenia's kernel owns those semantics in the product.
 ### S001 — image validation
 
 Evidence: `x360port_contract_tests` carries independent SHA-256 known answers,
-the shared PE-to-flat-image positive discriminator, and malformed source/geometry
-refusals. The retained module validator still mutates every authenticated
+the loaded-PE-image positive discriminator (a section whose VirtualAddress differs
+from its raw offset stays at its raw offset), an entry valid only at the section's
+VirtualAddress refused, and malformed source/geometry refusals. The retained module validator still mutates every authenticated
 image/layout field, including a malformed image base that must receive a typed
-refusal before Xenia fixed allocation. `x360port::MapPeImage` preserves the
-normalized source digest separately from the flat runtime-image digest.
+refusal before Xenia fixed allocation. `x360port::DescribeLoadedPeImage` describes
+the image in place: the XEX loader copies the decompressed basefile flat and never
+moves a section to its PE VirtualAddress. The earlier `MapPeImage` did move them,
+which displaced every Gears 1 address at or above `.text` by 0x4E00 (more for later
+sections); Gears 1's translated-function starts disprove that layout (10,215 of
+13,997 begin with `mflr r12` in the loaded layout, 300 in the moved one).
 
 ### S002 — import validation
 
@@ -255,7 +260,7 @@ success is inferred while that known dependency failure remains.
 Evidence: `x360-xex-inspect` validates XEX2 header, security geometry, file-format
 and payload bounds before entering Xenia, then uses the pinned Xenia loader's
 decryption/decompression path, canonicalizes import records and function stubs,
-maps the PE, and reports execution metadata, ordered logical imports, and the
+describes the loaded PE image, and reports execution metadata, ordered logical imports, and the
 correctly indexed import-library names. The string-table parser follows the XEX
 library-index and alignment contract, so multiple library records remain distinct
 (`xam.xex` versus `xboxkrnl.exe`) instead of treating the index as a byte offset.

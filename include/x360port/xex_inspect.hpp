@@ -37,7 +37,7 @@ struct XexImport
 
 struct XexInspection
 {
-    std::vector<std::byte> normalized_image;
+    std::vector<std::byte> loaded_image;
     XexExecutionInfo execution;
     PeImageLayout image;
     std::vector<XexImport> imports;
@@ -53,8 +53,9 @@ struct XexInspectionResult
 };
 
 // Authenticates and expands one XEX2 image through the pinned Xenia loader.
-// The normalized image is the decrypted/decompressed XEX image container that
-// MapPeImage consumes; it is not a runtime cache and must remain user-owned.
+// The loaded image is the decrypted, decompressed basefile exactly as the
+// loader leaves it at the image base; it is not a runtime cache and must
+// remain user-owned.
 [[nodiscard]] XexInspectionResult InspectXex(std::span<const std::byte> xex);
 
 } // namespace x360port

@@ -6,7 +6,8 @@
 namespace x360port
 {
 
-void ScanXexHelpers(const PeImageLayout& image, std::array<std::vector<GuestAddress>, 8>& helpers);
+void ScanXexHelpers(const PeImageLayout& layout, std::span<const std::byte> image,
+                    std::array<std::vector<GuestAddress>, 8>& helpers);
 
 } // namespace x360port
 

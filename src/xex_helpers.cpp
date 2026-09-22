@@ -18,7 +18,8 @@ struct HelperPattern
 
 } // namespace
 
-void ScanXexHelpers(const PeImageLayout& image, std::array<std::vector<GuestAddress>, 8>& helpers)
+void ScanXexHelpers(const PeImageLayout& layout, std::span<const std::byte> image,
+                    std::array<std::vector<GuestAddress>, 8>& helpers)
 {
     static constexpr std::array<std::uint8_t, 4> kRestGpr = {0xe9U, 0xc1U, 0xffU, 0x68U};
     static constexpr std::array<std::uint8_t, 4> kSaveGpr = {0xf9U, 0xc1U, 0xffU, 0x68U};
@@ -42,18 +43,18 @@ void ScanXexHelpers(const PeImageLayout& image, std::array<std::vector<GuestAddr
         {kRestVmx64.data(), kRestVmx64.size()},
         {kSaveVmx64.data(), kSaveVmx64.size()},
     }};
-    for (const PeSection& section : image.sections)
+    for (const PeSection& section : layout.sections)
     {
-        if (!section.code || section.base < image.identity.base)
+        if (!section.code || section.base < layout.identity.base)
         {
             continue;
         }
-        const std::size_t image_offset = section.base - image.identity.base;
-        if (image_offset > image.image.size() || section.size > image.image.size() - image_offset)
+        const std::size_t image_offset = section.base - layout.identity.base;
+        if (image_offset > image.size() || section.size > image.size() - image_offset)
         {
             continue;
         }
-        const std::span<const std::byte> code(image.image.data() + image_offset, section.size);
+        const std::span<const std::byte> code = image.subspan(image_offset, section.size);
         for (std::size_t pattern_index = 0; pattern_index < kPatterns.size(); ++pattern_index)
         {
             const HelperPattern& pattern = kPatterns[pattern_index];

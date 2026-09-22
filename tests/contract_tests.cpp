@@ -142,7 +142,7 @@ void TestSha256KnownAnswer()
     }
 }
 
-void TestPeImageLayout()
+void TestLoadedPeImage()
 {
     std::vector<std::byte> source(0x400U);
     const auto put16 = [&source](std::size_t offset, std::uint16_t value)
@@ -166,7 +166,8 @@ void TestPeImageLayout()
     put16(0x86U, 1U);
     put16(0x94U, 224U);
     put16(0x98U, 0x10bU);
-    put32(0xa8U, 0x1000U);
+    // The entry point is where the loader leaves .text: at its raw offset.
+    put32(0xa8U, 0x200U);
     put32(0xb4U, 0x82000000U);
     put32(0xb8U, 0x1000U);
     put32(0xd0U, 0x2000U);
@@ -187,24 +188,40 @@ void TestPeImageLayout()
     source[0x202U] = std::byte{0x00};
     source[0x203U] = std::byte{0x20};
 
-    const PeImageLayoutResult mapped = MapPeImage(source);
+    // .text claims VirtualAddress 0x1000 but sits at raw offset 0x200, as
+    // Gears of War's does 0x4E00 apart. The loaded image keeps it at 0x200.
+    const PeImageLayoutResult loaded = DescribeLoadedPeImage(source);
     ++checks;
-    if (!mapped || mapped.layout.identity.base != 0x82000000U ||
-        mapped.layout.identity.entry_point != 0x82001000U ||
-        mapped.layout.code.base != 0x82001000U || mapped.layout.image.size() != 0x2000U ||
-        mapped.layout.image[0x1000U] != std::byte{0x4e} || mapped.layout.sections.size() != 1U)
+    if (!loaded || loaded.layout.identity.base != 0x82000000U ||
+        loaded.layout.identity.entry_point != 0x82000200U ||
+        loaded.layout.identity.size != 0x400U || loaded.layout.code.base != 0x82000200U ||
+        loaded.layout.code.size != 0x200U || loaded.layout.sections.size() != 1U ||
+        loaded.layout.sections[0].base != 0x82000200U ||
+        loaded.layout.identity.sha256 != HashBytes(source))
     {
-        std::fprintf(stderr, "FAIL PE image layout positive discriminator: %s\n",
-                     mapped.error.c_str());
+        std::fprintf(stderr, "FAIL loaded PE image positive discriminator: %s\n",
+                     loaded.error.c_str());
         ++failures;
     }
 
+    // An entry point that is only valid at the section's VirtualAddress is
+    // outside the loaded code, so the image is refused rather than relaid.
+    put32(0xa8U, 0x1000U);
+    const PeImageLayoutResult virtual_entry = DescribeLoadedPeImage(source);
+    ++checks;
+    if (virtual_entry)
+    {
+        std::fprintf(stderr, "FAIL loaded PE image accepted an entry outside its loaded code\n");
+        ++failures;
+    }
+    put32(0xa8U, 0x200U);
+
     put32(section + 16U, 0x300U);
-    const PeImageLayoutResult refused = MapPeImage(source);
+    const PeImageLayoutResult refused = DescribeLoadedPeImage(source);
     ++checks;
     if (refused)
     {
-        std::fprintf(stderr, "FAIL PE image layout accepted an out-of-bounds section\n");
+        std::fprintf(stderr, "FAIL loaded PE image accepted an out-of-bounds section\n");
         ++failures;
     }
 }
@@ -377,7 +394,7 @@ void TestErrorCoverage()
 [[nodiscard]] int RunTests()
 {
     TestSha256KnownAnswer();
-    TestPeImageLayout();
+    TestLoadedPeImage();
     TestImportDigestCoverage();
     TestAcceptance();
     TestModuleRefusals();

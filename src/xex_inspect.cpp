@@ -311,7 +311,7 @@ void NormalizeFunctionStub(std::span<std::byte> image, std::size_t offset)
             const std::uint32_t record = ReadU32Be(header, record_entry);
             if (record == 0U || (record & 3U) != 0U || !InImage(record, context.image, 4U))
             {
-                error = "XEX import record points outside the normalized image";
+                error = "XEX import record points outside the loaded image";
                 return false;
             }
             const std::size_t record_offset = static_cast<std::size_t>(record - context.image.base);
@@ -398,17 +398,17 @@ XexInspectionResult InspectXex(std::span<const std::byte> xex)
     if (base == 0U || image_size == 0U || !HasBytes(xex, 0, header.size))
     {
         static_cast<void>(module.Unload());
-        return Refuse("Xenia produced invalid normalized image geometry");
+        return Refuse("Xenia produced invalid loaded image geometry");
     }
-    const auto* normalized = memory.TranslateVirtual(base);
-    if (normalized == nullptr)
+    const auto* loaded = memory.TranslateVirtual(base);
+    if (loaded == nullptr)
     {
         static_cast<void>(module.Unload());
-        return Refuse("Xenia did not expose the normalized guest image");
+        return Refuse("Xenia did not expose the loaded guest image");
     }
     XexInspection inspection;
-    inspection.normalized_image.resize(image_size);
-    std::memcpy(inspection.normalized_image.data(), normalized, image_size);
+    inspection.loaded_image.resize(image_size);
+    std::memcpy(inspection.loaded_image.data(), loaded, image_size);
     const auto* execution = module.opt_execution_info();
     if (execution == nullptr)
     {
@@ -420,21 +420,21 @@ XexInspectionResult InspectXex(std::span<const std::byte> xex)
         execution->base_version_value, execution->platform,   execution->executable_table,
         execution->disc_number,        execution->disc_count, execution->savegame_id,
     };
-    const ImportContext import_context{header, {base, inspection.normalized_image.size()}};
-    if (!ParseImports(xex.first(header.size), inspection.normalized_image, import_context,
+    const ImportContext import_context{header, {base, inspection.loaded_image.size()}};
+    if (!ParseImports(xex.first(header.size), inspection.loaded_image, import_context,
                       inspection.imports, error))
     {
         static_cast<void>(module.Unload());
         return Refuse(std::move(error));
     }
-    const PeImageLayoutResult mapped = MapPeImage(inspection.normalized_image);
-    if (!mapped)
+    const PeImageLayoutResult described = DescribeLoadedPeImage(inspection.loaded_image);
+    if (!described)
     {
         static_cast<void>(module.Unload());
-        return Refuse("normalized XEX image is not a supported Xbox 360 PE: " + mapped.error);
+        return Refuse("loaded XEX image is not a supported Xbox 360 PE: " + described.error);
     }
-    inspection.image = mapped.layout;
-    ScanXexHelpers(inspection.image, inspection.helpers);
+    inspection.image = described.layout;
+    ScanXexHelpers(inspection.image, inspection.loaded_image, inspection.helpers);
     static_cast<void>(module.Unload());
     return {.inspection = std::move(inspection), .error = {}};
 }

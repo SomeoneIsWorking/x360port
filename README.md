@@ -55,8 +55,8 @@ build failures in one run; any build failure stops verification before CTest.
 
 The runtime build also provides `x360-xex-inspect`, which accepts a user-owned
 XEX2, refuses malformed container and payload bounds, and emits a strict JSON
-inspection plus the canonical normalized image when requested with
-`--image-out`. It is an input/identity boundary only; it does not launch a title
+inspection plus the loaded image (the decompressed basefile as the loader leaves
+it at the image base) when requested with `--image-out`. It is an input/identity boundary only; it does not launch a title
 or provide a gameplay fallback.
 
 The required Xenia revision is
