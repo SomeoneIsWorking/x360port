@@ -7,8 +7,10 @@
 #include "x360port/system_session.hpp"
 
 #include <cstddef>
+#include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace xe
@@ -29,11 +31,12 @@ namespace x360port
 
 // Owns Xenia's logger for the session's lifetime. Xenia's logger blocks the
 // first thread that logs when it was never initialised, and must be drained
-// before the process exits.
+// before the process exits. The log is written to `log_path`, never beside the
+// executable, which may be a read-only install.
 class XeniaLoggingScope final
 {
   public:
-    explicit XeniaLoggingScope(const std::string& application_name);
+    XeniaLoggingScope(const std::string& application_name, const std::filesystem::path& log_path);
     XeniaLoggingScope(const XeniaLoggingScope&) = delete;
     XeniaLoggingScope& operator=(const XeniaLoggingScope&) = delete;
     XeniaLoggingScope(XeniaLoggingScope&&) = delete;
