@@ -1,9 +1,11 @@
 Checks: >
-  -*,
+  clang-analyzer-*,
   bugprone-*,
   performance-*,
-  portability-*
+  portability-*,
+  readability-braces-around-statements
+CheckOptions:
+  readability-braces-around-statements.ShortStatementLines: 0
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*/(include|src|tests)/.*'
 FormatStyle: file
-

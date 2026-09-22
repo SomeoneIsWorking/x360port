@@ -33,8 +33,8 @@ class ExportNames final
 
     struct Export final
     {
-        std::uint32_t ordinal = 0;
         std::string_view name;
+        std::uint32_t ordinal = 0;
         ImportKind kind = ImportKind::Function;
     };
 

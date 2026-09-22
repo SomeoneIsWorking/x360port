@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -300,7 +301,12 @@ void TestModuleRefusals()
     ModuleRefusal("invalid import kind", ValidationError::InvalidImport,
                   [](Fixture& value)
                   {
-                      value.module.imports[0].kind = static_cast<ImportKind>(0xffU);
+                      // A malformed image carries a byte, not an enumerator.
+                      // Copying the object representation states that without
+                      // naming a value the enumeration does not declare.
+                      constexpr std::uint8_t undeclared_kind = 0xFFU;
+                      std::memcpy(&value.module.imports[0].kind, &undeclared_kind,
+                                  sizeof(undeclared_kind));
                       value.module.ResealImports();
                   });
     ModuleRefusal("function import outside code", ValidationError::InvalidImport,
