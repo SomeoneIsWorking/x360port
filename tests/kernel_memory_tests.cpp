@@ -157,23 +157,19 @@ class ArgumentBlock final
 
     void Set(std::uint32_t base, std::uint32_t size) const
     {
-        Store(address_, base);
-        Store(address_ + 4U, size);
+        const std::array<std::byte, 8> bytes{
+            static_cast<std::byte>(base >> 24U), static_cast<std::byte>(base >> 16U),
+            static_cast<std::byte>(base >> 8U),  static_cast<std::byte>(base),
+            static_cast<std::byte>(size >> 24U), static_cast<std::byte>(size >> 16U),
+            static_cast<std::byte>(size >> 8U),  static_cast<std::byte>(size)};
+        const RuntimeFailure failure = runtime_->WriteGuestMemory(address_, bytes);
+        Require(!failure, failure.detail);
     }
 
     [[nodiscard]] std::uint32_t base() const { return Load(address_); }
     [[nodiscard]] std::uint32_t size() const { return Load(address_ + 4U); }
 
   private:
-    void Store(GuestAddress address, std::uint32_t value) const
-    {
-        const std::array<std::byte, 4> bytes{
-            static_cast<std::byte>(value >> 24U), static_cast<std::byte>(value >> 16U),
-            static_cast<std::byte>(value >> 8U), static_cast<std::byte>(value)};
-        const RuntimeFailure failure = runtime_->WriteGuestMemory(address, bytes);
-        Require(!failure, failure.detail);
-    }
-
     [[nodiscard]] std::uint32_t Load(GuestAddress address) const
     {
         std::array<std::byte, 4> bytes{};

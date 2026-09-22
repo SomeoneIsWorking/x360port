@@ -63,12 +63,14 @@ set(X360PORT_RUNTIME_SOURCES
     src/runtime_imports.cpp
     src/xam_input.cpp
     src/xenia_backend.cpp
+    src/xenia_instance_lease.cpp
     src/xex_helpers.cpp
     src/xex_imports.cpp
     src/xex_inspect.cpp
 )
 set(X360PORT_RUNTIME_HEADERS
     include/x360port/export_names.hpp
+    include/x360port/guest_call.hpp
     include/x360port/import_claims.hpp
     include/x360port/runtime.hpp
     include/x360port/runtime_failure.hpp
@@ -88,7 +90,20 @@ set(X360PORT_RUNTIME_HEADERS
     src/xenia_backend.hpp
     src/xex_helpers.hpp
     src/xex_imports.hpp
+    src/xenia_instance_lease.hpp
     include/x360port/xex_inspect.hpp
+)
+set(X360PORT_SYSTEM_SOURCES
+    src/system/system_call_context.cpp
+    src/system/system_input_driver.cpp
+    src/system/system_session.cpp
+    src/system/system_window_gtk.cpp
+)
+set(X360PORT_SYSTEM_HEADERS
+    include/x360port/system_session.hpp
+    src/system/system_call_context.hpp
+    src/system/system_input_driver.hpp
+    src/system/system_session_impl.hpp
 )
 
 if(NOT X360PORT_VALIDATION_ONLY)
@@ -172,6 +187,36 @@ if(NOT X360PORT_VALIDATION_ONLY)
             x360port_validation
             ${X360PORT_XENIA_LIBRARIES})
     endif()
+    # The full console: Xenia's kernel, file system, audio, GPU, and input
+    # composed around one title. It needs a windowed host for its product
+    # path, which exists for GTK on Linux; elsewhere the target is absent and
+    # a consumer that requires it fails at configure time by this name.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_library(x360port_system STATIC
+            ${X360PORT_SYSTEM_SOURCES}
+            ${X360PORT_SYSTEM_HEADERS})
+        add_library(x360port::system ALIAS x360port_system)
+        target_include_directories(x360port_system SYSTEM PRIVATE
+            "${X360PORT_XENIA_SOURCE_DIR}"
+            "${X360PORT_XENIA_SOURCE_DIR}/src"
+            "${X360PORT_XENIA_SOURCE_DIR}/third_party/Vulkan-Headers/include")
+        x360port_enable_warnings(x360port_system)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(X360PORT_GTK3 REQUIRED IMPORTED_TARGET gtk+-3.0)
+        # Only the subsystems x360port's executor does not already link; its
+        # own link group resolves their references back into the core. The
+        # core comes first: CMake drops a group member's own link dependencies
+        # (xenia-ui's X11 and fontconfig) when that member is first reached
+        # outside its group, here through xenia-ui-vulkan.
+        target_link_libraries(x360port_system PUBLIC
+            x360port
+            xenia-apu-sdl xenia-apu xenia-gpu-vulkan xenia-ui-vulkan xenia-hid xenia-vfs
+            PkgConfig::X360PORT_GTK3)
+        # Xenia's SDL2 interface is ordinary, so its headers would be checked
+        # as first-party code; they are a dependency's.
+        set_property(TARGET SDL2 PROPERTY SYSTEM TRUE)
+    endif()
+
     add_executable(xex_inspect tools/xex_inspect.cpp)
     target_link_libraries(xex_inspect PRIVATE x360port)
     x360port_enable_warnings(xex_inspect)
@@ -214,6 +259,13 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         target_link_libraries(x360port_xex_inspect_tests PRIVATE x360port)
         x360port_enable_warnings(x360port_xex_inspect_tests)
         add_test(NAME xex_inspect COMMAND x360port_xex_inspect_tests)
+
+        if(TARGET x360port_system)
+            add_executable(x360port_system_config_tests tests/system_config_tests.cpp)
+            target_link_libraries(x360port_system_config_tests PRIVATE x360port_system)
+            x360port_enable_warnings(x360port_system_config_tests)
+            add_test(NAME system_config COMMAND x360port_system_config_tests)
+        endif()
     endif()
 
     add_test(
@@ -223,9 +275,13 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 ${X360PORT_VALIDATION_HEADERS}
                 ${X360PORT_RUNTIME_SOURCES}
                 ${X360PORT_RUNTIME_HEADERS}
+                ${X360PORT_SYSTEM_SOURCES}
+                ${X360PORT_SYSTEM_HEADERS}
                 tests/contract_tests.cpp
                 tests/export_name_tests.cpp
                 tests/import_runtime_tests.cpp
+                tests/kernel_memory_tests.cpp
+                tests/system_config_tests.cpp
                 tests/runtime_tests.cpp
                 tests/xex_inspect_tests.cpp
                 tests/warnings/probe.cpp
@@ -247,14 +303,20 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                     ${X360PORT_RUNTIME_SOURCES}
                     tests/export_name_tests.cpp
                     tests/import_runtime_tests.cpp
+                    tests/kernel_memory_tests.cpp
                     tests/runtime_tests.cpp
                     tests/xex_inspect_tests.cpp
-                    src/xenia_backend.cpp
-                    src/xex_helpers.cpp
-                    src/xex_imports.cpp
-                    src/xex_inspect.cpp
                     tools/xex_inspect.cpp
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        if(TARGET x360port_system)
+            add_test(
+                NAME system_clang_tidy
+                COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
+                        --warnings-as-errors=*
+                        ${X360PORT_SYSTEM_SOURCES}
+                        tests/system_config_tests.cpp
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        endif()
     endif()
     add_test(NAME structure
         COMMAND ${Python3_EXECUTABLE} tools/check_structure.py
