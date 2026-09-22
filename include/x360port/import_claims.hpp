@@ -2,7 +2,8 @@
 #define X360PORT_IMPORT_CLAIMS_HPP
 
 #include "x360port/export_names.hpp"
-#include "x360port/runtime.hpp"
+#include "x360port/runtime_failure.hpp"
+#include "x360port/validation.hpp"
 
 #include <cstddef>
 #include <cstdint>

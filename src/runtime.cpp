@@ -6,32 +6,31 @@
 #include "guest_fault_guard.hpp"
 #include "guest_memory.hpp"
 #include "guest_range_reservation.hpp"
+#include "guest_thread_context.hpp"
+#include "guest_virtual_memory.hpp"
 #include "interpreter_fallback.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
 #include "xenia_backend.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <utility>
 
 #include "xenia/cpu/function.h"
 #include "xenia/cpu/processor.h"
 #include "xenia/cpu/raw_module.h"
-#include "xenia/cpu/thread_state.h"
 #include "xenia/memory.h"
 
 namespace x360port
 {
 namespace
 {
-
-constexpr std::uint32_t kThreadId = 0x360;
-constexpr std::uint32_t kStackSize = 64 * 1024;
-constexpr std::uint32_t kPcrSize = 0x1000;
 
 std::mutex g_instance_mutex;
 bool g_instance_active = false;
@@ -52,15 +51,7 @@ class RuntimeContext::Impl final
 
     ~Impl()
     {
-        thread_state_.reset();
-        if (memory_ != nullptr && stack_address_ != 0)
-        {
-            memory_->SystemHeapFree(stack_address_);
-        }
-        if (memory_ != nullptr && pcr_address_ != 0)
-        {
-            memory_->SystemHeapFree(pcr_address_);
-        }
+        thread_.Reset();
         // The guard holds the processor's code cache and an installed handler,
         // so it is torn down before the processor it observes.
         fault_guard_.reset();
@@ -120,20 +111,13 @@ class RuntimeContext::Impl final
         fault_guard_ =
             std::make_unique<GuestFaultGuard>(*processor_->backend()->code_cache(), *memory_);
 
-        stack_address_ = memory_->SystemHeapAlloc(kStackSize);
-        if (stack_address_ == 0)
+        if (RuntimeFailure thread_failure = thread_.Initialize(*memory_, *processor_);
+            thread_failure)
         {
-            return Failure(RuntimeError::StackAllocationFailed,
-                           "Xenia could not allocate the bounded guest call stack");
+            return thread_failure;
         }
-        pcr_address_ = memory_->SystemHeapAlloc(kPcrSize);
-        if (pcr_address_ == 0)
-        {
-            return Failure(RuntimeError::StackAllocationFailed,
-                           "Xenia could not allocate the guest thread PCR");
-        }
-        thread_state_ = std::make_unique<xe::cpu::ThreadState>(
-            processor_.get(), kThreadId, stack_address_ + kStackSize, pcr_address_);
+        virtual_memory_.emplace(*memory_);
+        kernel_claims_ = virtual_memory_->Claims();
         processor_->PreLaunch();
         return {};
     }
@@ -321,7 +305,7 @@ class RuntimeContext::Impl final
             guest_function->machine_code_length() == 0)
         {
             ++statistics_.translation_failures;
-            return ExecuteInterpreterFallback(*processor_, *thread_state_, address, arguments,
+            return ExecuteInterpreterFallback(*processor_, thread_.State(), address, arguments,
                                               limits, statistics_);
         }
 
@@ -331,7 +315,8 @@ class RuntimeContext::Impl final
             statistics_.emitted_host_bytes += guest_function->machine_code_length();
         }
 
-        ExecutionResult result = ExecuteGuestFunction(*function, *thread_state_, arguments, limits);
+        ExecutionResult result =
+            ExecuteGuestFunction(*function, thread_.State(), arguments, limits);
         if (result.failure.error == RuntimeError::ExecutionBudgetExceeded)
         {
             ++statistics_.execution_budget_exhaustions;
@@ -357,6 +342,10 @@ class RuntimeContext::Impl final
 
     [[nodiscard]] const JitStatistics& Statistics() const noexcept { return statistics_; }
     [[nodiscard]] GuestMemory& GuestMemoryOwner() noexcept { return guest_memory_; }
+    [[nodiscard]] std::span<const ImportClaim> KernelServiceClaims() const noexcept
+    {
+        return kernel_claims_;
+    }
 
     void BindOverrideOwner(RuntimeContext& owner) noexcept
     {
@@ -377,14 +366,14 @@ class RuntimeContext::Impl final
     GuestMemory guest_memory_;
     std::unique_ptr<xe::cpu::ExportResolver> export_resolver_;
     std::unique_ptr<xe::cpu::Processor> processor_;
-    std::unique_ptr<xe::cpu::ThreadState> thread_state_;
+    GuestThreadContext thread_;
+    std::optional<GuestVirtualMemory> virtual_memory_;
+    std::array<ImportClaim, 3> kernel_claims_{};
     std::unique_ptr<GuestFaultGuard> fault_guard_;
     std::unique_ptr<ExecutableInvalidation> invalidation_;
     std::unique_ptr<RuntimeImports> imports_;
     xe::cpu::RawModule* module_ = nullptr;
     CodeRange code_range_{};
-    std::uint32_t stack_address_ = 0;
-    std::uint32_t pcr_address_ = 0;
     std::uint32_t image_address_ = 0;
     OverrideDispatch overrides_;
     JitStatistics statistics_{};
@@ -436,6 +425,11 @@ RuntimeFailure RuntimeContext::WriteMappedGuestMemory(GuestAddress address,
 RuntimeFailure RuntimeContext::ReleaseGuestMemory(GuestMemoryAllocation allocation)
 {
     return impl_->GuestMemoryOwner().Release(allocation);
+}
+
+std::span<const ImportClaim> RuntimeContext::KernelServiceClaims() const noexcept
+{
+    return impl_->KernelServiceClaims();
 }
 
 RuntimeFailure RuntimeContext::LoadModule(const GuestModule& module,

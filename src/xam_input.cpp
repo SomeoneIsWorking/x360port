@@ -1,5 +1,7 @@
 #include "x360port/xam_input.hpp"
 
+#include "guest_endian.hpp"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -13,32 +15,16 @@ constexpr std::size_t kInputStateBytes = 16U;
 constexpr std::size_t kInputCapabilitiesBytes = 20U;
 
 template <std::size_t Size>
-void Store16(std::array<std::byte, Size>& bytes, std::size_t offset, std::uint16_t value) noexcept
-{
-    bytes[offset] = static_cast<std::byte>(value >> 8U);
-    bytes[offset + 1U] = static_cast<std::byte>(value);
-}
-
-template <std::size_t Size>
-void Store32(std::array<std::byte, Size>& bytes, std::size_t offset, std::uint32_t value) noexcept
-{
-    bytes[offset] = static_cast<std::byte>(value >> 24U);
-    bytes[offset + 1U] = static_cast<std::byte>(value >> 16U);
-    bytes[offset + 2U] = static_cast<std::byte>(value >> 8U);
-    bytes[offset + 3U] = static_cast<std::byte>(value);
-}
-
-template <std::size_t Size>
 void StoreGamepad(std::array<std::byte, Size>& bytes, std::size_t offset,
                   const XamGamepad& gamepad) noexcept
 {
-    Store16(bytes, offset, gamepad.buttons);
+    StoreBe16(bytes, offset, gamepad.buttons);
     bytes[offset + 2U] = static_cast<std::byte>(gamepad.left_trigger);
     bytes[offset + 3U] = static_cast<std::byte>(gamepad.right_trigger);
-    Store16(bytes, offset + 4U, static_cast<std::uint16_t>(gamepad.thumb_lx));
-    Store16(bytes, offset + 6U, static_cast<std::uint16_t>(gamepad.thumb_ly));
-    Store16(bytes, offset + 8U, static_cast<std::uint16_t>(gamepad.thumb_rx));
-    Store16(bytes, offset + 10U, static_cast<std::uint16_t>(gamepad.thumb_ry));
+    StoreBe16(bytes, offset + 4U, static_cast<std::uint16_t>(gamepad.thumb_lx));
+    StoreBe16(bytes, offset + 6U, static_cast<std::uint16_t>(gamepad.thumb_ly));
+    StoreBe16(bytes, offset + 8U, static_cast<std::uint16_t>(gamepad.thumb_rx));
+    StoreBe16(bytes, offset + 10U, static_cast<std::uint16_t>(gamepad.thumb_ry));
 }
 
 [[nodiscard]] std::array<std::byte, kInputStateBytes>
@@ -49,7 +35,7 @@ EncodeState(const XamPadSnapshot& snapshot) noexcept
     {
         return bytes;
     }
-    Store32(bytes, 0U, snapshot.packet_number);
+    StoreBe32(bytes, 0U, snapshot.packet_number);
     StoreGamepad(bytes, 4U, snapshot.gamepad);
     return bytes;
 }
@@ -64,10 +50,10 @@ EncodeCapabilities(const XamPadCapabilities& capabilities) noexcept
     }
     bytes[0] = static_cast<std::byte>(capabilities.type);
     bytes[1] = static_cast<std::byte>(capabilities.sub_type);
-    Store16(bytes, 2U, capabilities.flags);
+    StoreBe16(bytes, 2U, capabilities.flags);
     StoreGamepad(bytes, 4U, capabilities.supported_gamepad);
-    Store16(bytes, 16U, capabilities.left_motor_speed);
-    Store16(bytes, 18U, capabilities.right_motor_speed);
+    StoreBe16(bytes, 16U, capabilities.left_motor_speed);
+    StoreBe16(bytes, 18U, capabilities.right_motor_speed);
     return bytes;
 }
 
