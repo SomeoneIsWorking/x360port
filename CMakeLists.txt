@@ -54,6 +54,8 @@ set(X360PORT_RUNTIME_SOURCES
     src/guest_execution.cpp
     src/guest_fault_guard.cpp
     src/guest_memory.cpp
+    src/guest_thread_context.cpp
+    src/guest_virtual_memory.cpp
     src/interpreter_fallback.cpp
     src/override_dispatch.cpp
     src/runtime.cpp
@@ -69,10 +71,14 @@ set(X360PORT_RUNTIME_HEADERS
     include/x360port/export_names.hpp
     include/x360port/import_claims.hpp
     include/x360port/runtime.hpp
+    include/x360port/runtime_failure.hpp
     include/x360port/xam_input.hpp
     src/device_dispatch.hpp
     src/executable_invalidation.hpp
+    src/guest_endian.hpp
     src/guest_memory.hpp
+    src/guest_thread_context.hpp
+    src/guest_virtual_memory.hpp
     src/interpreter_fallback.hpp
     src/guest_call_frame.hpp
     src/guest_execution.hpp
@@ -193,6 +199,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         target_link_libraries(x360port_import_runtime_tests PRIVATE x360port)
         x360port_enable_warnings(x360port_import_runtime_tests)
         add_test(NAME import_runtime COMMAND x360port_import_runtime_tests)
+
+        add_executable(x360port_kernel_memory_tests tests/kernel_memory_tests.cpp)
+        target_link_libraries(x360port_kernel_memory_tests PRIVATE x360port)
+        x360port_enable_warnings(x360port_kernel_memory_tests)
+        add_test(NAME kernel_memory COMMAND x360port_kernel_memory_tests)
 
         add_executable(x360port_export_name_tests tests/export_name_tests.cpp)
         target_link_libraries(x360port_export_name_tests PRIVATE x360port)

@@ -25,15 +25,18 @@ static or interpreter product path.
 | S015 | Checked XEX2 inspection and canonical normalized-image output | verified | S001, S002, S003, S004 | G001, G002 |
 | S016 | XAM controller state/capabilities imports use title-supplied device data | verified | S008, S011 | G001 |
 | S017 | Host services claim kernel/XAM imports by exported name | verified | S002, S008 | G001, G002 |
+| S018 | Kernel virtual-memory exports run over the embedded Xenia heaps | verified | S008, S017 | G001 |
 
 ## Current focus
 
-S011 is the current focus. The bounded JIT call and import-refusal contracts now
+S018 is complete and S011 remains the current focus. The bounded JIT call and import-refusal contracts now
 include fail-closed translation refusal for invalid and decoded-but-unimplemented
 PPC instructions. A bounded Xenia-owned interpreter fallback now executes a narrow
 integer, scalar-memory, comparison, and branch subset around `lswi`/`blr` and reports
 refusal counters. Gears has also exercised a nested real-image override call; broader
-service composition, gameplay, and complete fallback semantics remain open.
+service composition now begins with the kernel's virtual-memory exports, which run
+over the same Xenia heaps the embedded processor uses; gameplay and complete fallback
+semantics remain open.
 
 ## Capability details
 
@@ -298,3 +301,24 @@ claim is refused; the first shape of it left the claims preceding the refusal in
 which the partial-state assertion caught. `XamInputService` now claims its two exports by
 name instead of exposing ordinal constants, and the synthetic import manifest asks the
 export table for those ordinals rather than repeating them.
+
+### S018 — kernel virtual-memory services
+
+Evidence: `x360port_kernel_memory_tests` loads an authenticated synthetic module whose
+manifest imports `NtAllocateVirtualMemory`, `NtFreeVirtualMemory`, and
+`NtQueryVirtualMemory` by exported name, resolves them through the claims
+`RuntimeContext` publishes for its own kernel services, and calls each through Xenia's export machinery. It requires a
+kernel-chosen commit rounded to the 64 KiB granularity, a region query reporting the
+committed state and the requested protection, a decommit that keeps the reservation, a
+release that returns the range, and a re-commit of the released range that reads back
+zeroed rather than holding the guest's earlier bytes. Its negatives require a second
+release to report failure, a free of address zero to answer `MEMORY_NOT_ALLOCATED`
+without consulting a heap, a fixed base in the physical window to refuse, a zero size,
+absent allocation type, and null in/out pointers to refuse, an unknown region type to
+refuse, and `MEM_RESET` and an unmapped in/out pointer each to stop translated guest
+execution with their typed refusal reason. Both the zeroing and the zero-address answers
+were confirmed to fail when the service is mutated to the opposite behaviour.
+
+The guest ABI constants the test drives are restated from the console's documented
+values rather than read from the header the service uses, so a wrong constant fails
+instead of agreeing with itself.

@@ -1,7 +1,9 @@
 #ifndef X360PORT_RUNTIME_HPP
 #define X360PORT_RUNTIME_HPP
 
+#include "x360port/import_claims.hpp"
 #include "x360port/module_contract.hpp"
+#include "x360port/runtime_failure.hpp"
 #include "x360port/validation.hpp"
 
 #include <cstddef>
@@ -13,53 +15,6 @@
 
 namespace x360port
 {
-
-enum class RuntimeError : std::uint8_t
-{
-    None,
-    InstanceAlreadyActive,
-    MemoryInitializationFailed,
-    BackendInitializationFailed,
-    StackAllocationFailed,
-    ModuleAlreadyLoaded,
-    ModuleValidationFailed,
-    ImportValidationFailed,
-    VariableResolutionFailed,
-    ImportAttachmentFailed,
-    LoadStateInvalid,
-    ImageAllocationFailed,
-    ModuleRegistrationFailed,
-    EntryOutsideCode,
-    TranslationFailed,
-    InterpreterFallbackUnsupported,
-    InterpreterFallbackMemoryInvalid,
-    InterpreterFallbackBudgetExceeded,
-    ExecutionBudgetInvalid,
-    ExecutionBudgetExceeded,
-    ExecutionInvalidated,
-    GuestAccessViolation,
-    ImportServiceRefused,
-    ExecutionFailed,
-    OverrideInvalid,
-    OverrideAlreadyInstalled,
-    OverrideNotInstalled,
-    OverrideDispatchFailed,
-    DeviceRangeInvalid,
-    DeviceRangeRegistrationFailed,
-    ExecutableRangeInvalid,
-    ExecutableWatchRegistrationFailed,
-    ExecutableWatchRearmFailed,
-    GuestMemoryAllocationFailed,
-    GuestMemoryRangeInvalid,
-};
-
-struct RuntimeFailure
-{
-    RuntimeError error = RuntimeError::None;
-    std::string detail;
-
-    [[nodiscard]] explicit operator bool() const noexcept { return error != RuntimeError::None; }
-};
 
 struct GuestMemoryAllocation
 {
@@ -161,6 +116,12 @@ class RuntimeContext final
                                                         std::span<const std::byte> bytes);
     [[nodiscard]] RuntimeFailure ReleaseGuestMemory(GuestMemoryAllocation allocation);
 
+    // The kernel exports x360port implements over its own embedded Xenia
+    // state. A consumer resolves these beside its title services so one table
+    // decides which import each ordinal reaches; an export absent here keeps
+    // the consumer's own refusal.
+    [[nodiscard]] std::span<const ImportClaim> KernelServiceClaims() const noexcept;
+
     [[nodiscard]] RuntimeFailure LoadModule(const GuestModule& module,
                                             std::span<const ImportBinding> bindings);
     // Installs a title-owned native implementation at an image address. The
@@ -199,8 +160,6 @@ struct RuntimeCreateResult
 
     [[nodiscard]] explicit operator bool() const noexcept { return context != nullptr && !failure; }
 };
-
-[[nodiscard]] std::string_view ToString(RuntimeError error) noexcept;
 
 } // namespace x360port
 
