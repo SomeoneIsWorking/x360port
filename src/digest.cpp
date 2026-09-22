@@ -4,7 +4,8 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <vector>
+#include <span>
+#include <string_view>
 
 namespace x360port
 {
@@ -24,23 +25,6 @@ constexpr std::array<std::uint32_t, 64> RoundConstants = {
     0xc67178f2U,
 };
 
-void AppendU32(std::vector<std::byte>& bytes, std::uint32_t value)
-{
-    bytes.push_back(static_cast<std::byte>(value >> 24U));
-    bytes.push_back(static_cast<std::byte>(value >> 16U));
-    bytes.push_back(static_cast<std::byte>(value >> 8U));
-    bytes.push_back(static_cast<std::byte>(value));
-}
-
-void AppendString(std::vector<std::byte>& bytes, std::string_view value)
-{
-    AppendU32(bytes, static_cast<std::uint32_t>(value.size()));
-    for (const char character : value)
-    {
-        bytes.push_back(static_cast<std::byte>(character));
-    }
-}
-
 [[nodiscard]] std::uint32_t LoadBigEndian(const std::byte* bytes) noexcept
 {
     return (std::to_integer<std::uint32_t>(bytes[0]) << 24U) |
@@ -49,33 +33,81 @@ void AppendString(std::vector<std::byte>& bytes, std::string_view value)
            std::to_integer<std::uint32_t>(bytes[3]);
 }
 
-} // namespace
-
-Sha256Digest HashBytes(std::span<const std::byte> bytes) noexcept
+// SHA-256 over a byte stream that holds one 64-byte block, so hashing never
+// allocates and cannot fail.
+class Sha256Stream
 {
-    std::array<std::uint32_t, 8> state = {0x6a09e667U, 0xbb67ae85U, 0x3c6ef372U, 0xa54ff53aU,
-                                          0x510e527fU, 0x9b05688cU, 0x1f83d9abU, 0x5be0cd19U};
-
-    const std::size_t padded_size = ((bytes.size() + 9U + 63U) / 64U) * 64U;
-    std::vector<std::byte> padded(padded_size);
-    for (std::size_t index = 0; index < bytes.size(); ++index)
+  public:
+    void Update(std::span<const std::byte> bytes) noexcept
     {
-        padded[index] = bytes[index];
-    }
-    padded[bytes.size()] = std::byte{0x80};
-    const std::uint64_t bit_length = static_cast<std::uint64_t>(bytes.size()) * 8U;
-    for (std::size_t index = 0; index < 8U; ++index)
-    {
-        padded[padded_size - 1U - index] =
-            static_cast<std::byte>(bit_length >> static_cast<unsigned>(index * 8U));
+        for (std::byte value : bytes)
+        {
+            block_[block_size_] = value;
+            ++block_size_;
+            if (block_size_ == block_.size())
+            {
+                Compress();
+                block_size_ = 0;
+            }
+        }
+        total_bytes_ += bytes.size();
     }
 
-    for (std::size_t block = 0; block < padded.size(); block += 64U)
+    void UpdateU32(std::uint32_t value) noexcept
+    {
+        std::array<std::byte, 4> bytes = {
+            static_cast<std::byte>(value >> 24U), static_cast<std::byte>(value >> 16U),
+            static_cast<std::byte>(value >> 8U), static_cast<std::byte>(value)};
+        Update(bytes);
+    }
+
+    // Length-prefixed, so adjacent strings cannot run together.
+    void UpdateString(std::string_view value) noexcept
+    {
+        UpdateU32(static_cast<std::uint32_t>(value.size()));
+        Update(std::as_bytes(std::span(value.data(), value.size())));
+    }
+
+    [[nodiscard]] Sha256Digest Finish() noexcept
+    {
+        std::uint64_t bit_length = total_bytes_ * 8U;
+        std::array<std::byte, 1> pad = {std::byte{0x80}};
+        Update(pad);
+        pad[0] = std::byte{0};
+        while (block_size_ != kLengthOffset)
+        {
+            Update(pad);
+        }
+        std::array<std::byte, 8> length{};
+        for (std::size_t index = 0; index < length.size(); ++index)
+        {
+            length[length.size() - 1U - index] =
+                static_cast<std::byte>(bit_length >> static_cast<unsigned>(index * 8U));
+        }
+        Update(length);
+
+        Sha256Digest digest{};
+        for (std::size_t word = 0; word < state_.size(); ++word)
+        {
+            for (std::size_t byte = 0; byte < 4U; ++byte)
+            {
+                digest[word * 4U + byte] = static_cast<std::uint8_t>(
+                    state_[word] >> (24U - static_cast<unsigned>(byte * 8U)));
+            }
+        }
+        return digest;
+    }
+
+  private:
+    // The message's bit length fills the last eight bytes of the final block.
+    static constexpr std::size_t kLengthOffset = 56;
+
+    void Compress() noexcept
     {
         std::array<std::uint32_t, 64> words{};
         for (std::size_t index = 0; index < 16U; ++index)
         {
-            words[index] = LoadBigEndian(&padded[block + index * 4U]);
+            words[index] = LoadBigEndian(&block_[index * 4U]);
         }
         for (std::size_t index = 16; index < words.size(); ++index)
         {
@@ -88,7 +120,7 @@ Sha256Digest HashBytes(std::span<const std::byte> bytes) noexcept
             words[index] = words[index - 16U] + sigma0 + words[index - 7U] + sigma1;
         }
 
-        auto working = state;
+        auto working = state_;
         for (std::size_t index = 0; index < words.size(); ++index)
         {
             const std::uint32_t sum1 =
@@ -109,37 +141,41 @@ Sha256Digest HashBytes(std::span<const std::byte> bytes) noexcept
             working[4] += temporary1;
             working[0] = temporary1 + temporary2;
         }
-        for (std::size_t index = 0; index < state.size(); ++index)
+        for (std::size_t index = 0; index < state_.size(); ++index)
         {
-            state[index] += working[index];
+            state_[index] += working[index];
         }
     }
 
-    Sha256Digest digest{};
-    for (std::size_t word = 0; word < state.size(); ++word)
-    {
-        for (std::size_t byte = 0; byte < 4U; ++byte)
-        {
-            digest[word * 4U + byte] =
-                static_cast<std::uint8_t>(state[word] >> (24U - static_cast<unsigned>(byte * 8U)));
-        }
-    }
-    return digest;
+    std::array<std::uint32_t, 8> state_ = {0x6a09e667U, 0xbb67ae85U, 0x3c6ef372U, 0xa54ff53aU,
+                                           0x510e527fU, 0x9b05688cU, 0x1f83d9abU, 0x5be0cd19U};
+    std::array<std::byte, 64> block_{};
+    std::size_t block_size_ = 0;
+    std::uint64_t total_bytes_ = 0;
+};
+
+} // namespace
+
+Sha256Digest HashBytes(std::span<const std::byte> bytes) noexcept
+{
+    Sha256Stream stream;
+    stream.Update(bytes);
+    return stream.Finish();
 }
 
 Sha256Digest HashImportManifest(std::span<const ImportRequirement> imports) noexcept
 {
-    std::vector<std::byte> canonical;
+    Sha256Stream stream;
     for (const ImportRequirement& import : imports)
     {
-        AppendU32(canonical, static_cast<std::uint32_t>(import.kind));
-        AppendString(canonical, import.library);
-        AppendU32(canonical, import.ordinal);
-        AppendString(canonical, import.name);
-        AppendU32(canonical, import.address);
-        AppendU32(canonical, import.record_address);
+        stream.UpdateU32(static_cast<std::uint32_t>(import.kind));
+        stream.UpdateString(import.library);
+        stream.UpdateU32(import.ordinal);
+        stream.UpdateString(import.name);
+        stream.UpdateU32(import.address);
+        stream.UpdateU32(import.record_address);
     }
-    return HashBytes(canonical);
+    return stream.Finish();
 }
 
 } // namespace x360port

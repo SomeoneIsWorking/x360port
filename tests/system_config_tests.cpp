@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/system_session.hpp"
 
 #include <cstdlib>
@@ -56,11 +57,9 @@ void RequireRefused(SystemSessionConfig config, RuntimeError expected, std::stri
     Require(!created.failure.detail.empty(), std::string(field) + ": refusal carried no detail");
 }
 
-} // namespace
-
-int main(int, char** argv)
+[[nodiscard]] int RunTests(const char* program_path)
 {
-    const std::filesystem::path existing = std::filesystem::absolute(argv[0]);
+    const std::filesystem::path existing = std::filesystem::absolute(program_path);
     Require(std::filesystem::exists(existing), "the test binary's own path does not exist");
 
     SystemSessionConfig config = ValidConfig(existing);
@@ -99,4 +98,12 @@ int main(int, char** argv)
 
     std::cout << "system_config_tests: 8 invalid configs refused before composing a console\n";
     return EXIT_SUCCESS;
+}
+
+} // namespace
+
+int main(int, char** argv)
+{
+    return x360port::tests::GuardedMain("system_config_tests",
+                                        [argv] { return RunTests(argv[0]); });
 }

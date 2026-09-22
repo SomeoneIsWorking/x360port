@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -189,9 +190,7 @@ void WriteImage(const std::filesystem::path& path, std::span<const std::byte> im
     return output.str();
 }
 
-} // namespace
-
-int main(int argc, char** argv)
+[[nodiscard]] int Run(int argc, char** argv)
 {
     const std::string_view image_option =
         argc == 4 ? std::string_view(argv[2]) : std::string_view();
@@ -206,37 +205,48 @@ int main(int argc, char** argv)
                      "  --mapped-image-out  the loaded image, indexed by guest virtual address\n";
         return 2;
     }
-    try
+    const std::filesystem::path xex_path = argv[1];
+    const std::vector<std::byte> xex = ReadFile(xex_path);
+    const x360port::XexInspectionResult result = x360port::InspectXex(xex);
+    if (!result)
     {
-        const std::filesystem::path xex_path = argv[1];
-        const std::vector<std::byte> xex = ReadFile(xex_path);
-        const x360port::XexInspectionResult result = x360port::InspectXex(xex);
-        if (!result)
+        std::cerr << "x360-xex-inspect: refusing: " << result.error << '\n';
+        return 1;
+    }
+    if (wants_normalized_image)
+    {
+        WriteImage(argv[3], result.inspection.normalized_image);
+    }
+    else if (wants_mapped_image)
+    {
+        const x360port::PeImageLayoutResult mapped =
+            x360port::MapPeImage(result.inspection.normalized_image);
+        if (!mapped)
         {
-            std::cerr << "x360-xex-inspect: refusing: " << result.error << '\n';
+            std::cerr << "x360-xex-inspect: refusing: " << mapped.error << '\n';
             return 1;
         }
-        if (wants_normalized_image)
-        {
-            WriteImage(argv[3], result.inspection.normalized_image);
-        }
-        else if (wants_mapped_image)
-        {
-            const x360port::PeImageLayoutResult mapped =
-                x360port::MapPeImage(result.inspection.normalized_image);
-            if (!mapped)
-            {
-                std::cerr << "x360-xex-inspect: refusing: " << mapped.error << '\n';
-                return 1;
-            }
-            WriteImage(argv[3], mapped.layout.image);
-        }
-        std::cout << Document(xex, result.inspection);
-        return 0;
+        WriteImage(argv[3], mapped.layout.image);
+    }
+    std::cout << Document(xex, result.inspection);
+    return 0;
+}
+
+} // namespace
+
+int main(int argc, char** argv)
+{
+    try
+    {
+        return Run(argc, argv);
     }
     catch (const std::exception& error)
     {
-        std::cerr << "x360-xex-inspect: refusing: " << error.what() << '\n';
-        return 1;
+        std::fprintf(stderr, "x360-xex-inspect: refusing: %s\n", error.what());
     }
+    catch (...)
+    {
+        std::fprintf(stderr, "x360-xex-inspect: refusing: a non-standard exception\n");
+    }
+    return 1;
 }

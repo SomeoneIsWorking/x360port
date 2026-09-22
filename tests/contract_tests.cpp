@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/pe_image.hpp"
 #include "x360port/validation.hpp"
 
@@ -373,9 +374,7 @@ void TestErrorCoverage()
     }
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     TestSha256KnownAnswer();
     TestPeImageLayout();
@@ -392,3 +391,7 @@ int main()
     std::printf("%d checks passed (SHA-256, image layout, typed imports, refusals)\n", checks);
     return 0;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("contract_tests", RunTests); }

@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/import_claims.hpp"
 #include "x360port/runtime.hpp"
 #include "x360port/xam_input.hpp"
@@ -208,9 +209,7 @@ void Require(bool condition, std::string_view message)
     }
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     ImportObservations observations;
     PadObservations pad_observations;
@@ -421,3 +420,7 @@ int main()
                  "Xenia's export machinery\n";
     return 0;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("import_runtime_tests", RunTests); }

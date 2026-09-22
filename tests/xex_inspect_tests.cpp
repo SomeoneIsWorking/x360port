@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/xex_inspect.hpp"
 
 #include <cstddef>
@@ -42,9 +43,7 @@ bool Refuses(std::vector<std::byte> xex, std::string_view expected)
     return !result && result.error.find(expected) != std::string::npos;
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     if (!Refuses(std::vector<std::byte>(8), "fixed header"))
     {
@@ -86,3 +85,7 @@ int main()
     std::cout << "xex inspector preflight tests: PASS\n";
     return 0;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("xex_inspect_tests", RunTests); }

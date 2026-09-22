@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/desktop_input.hpp"
 
 #include <cstdlib>
@@ -75,9 +76,7 @@ void ReleaseAllClearsEverythingAndReleasesThePointer()
             "ReleaseAll kept travel from before the release");
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     KeysAndButtonsFollowTheirEvents();
     OnlyACapturedPointerTravelsAndEachSnapshotTakesIt();
@@ -85,3 +84,7 @@ int main()
     std::cout << "desktop_input_tests: 3 cases passed\n";
     return EXIT_SUCCESS;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("desktop_input_tests", RunTests); }
