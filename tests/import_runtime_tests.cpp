@@ -1,3 +1,4 @@
+#include "x360port/import_claims.hpp"
 #include "x360port/runtime.hpp"
 #include "x360port/xam_input.hpp"
 
@@ -101,6 +102,19 @@ void FunctionImport(GuestImportContext& call, void* context) noexcept
     return 0;
 }
 
+// The export table is the single authority for these ordinals, so the synthetic
+// manifest asks it by name rather than repeating the numbers here.
+[[nodiscard]] std::uint32_t XamOrdinal(std::string_view name)
+{
+    const auto found = ExportNames::Find(ExportNames::Library::Xam, name);
+    if (!found.has_value())
+    {
+        std::cerr << "import runtime contract failed: xam.xex does not export " << name << '\n';
+        std::exit(EXIT_FAILURE);
+    }
+    return found->ordinal;
+}
+
 class ImportedTestModule final : public GuestModule
 {
   public:
@@ -112,13 +126,13 @@ class ImportedTestModule final : public GuestModule
                        "VariableSynthetic",  kVariableRecordAddress, kVariableRecordAddress};
         imports_[2] = {ImportKind::Function,
                        "xam.xex",
-                       kXamInputGetCapabilitiesOrdinal,
+                       XamOrdinal("XamInputGetCapabilities"),
                        "XamInputGetCapabilities",
                        kXamCapabilitiesImportAddress,
                        kXamCapabilitiesImportAddress};
-        imports_[3] = {ImportKind::Function,     "xam.xex",
-                       kXamInputGetStateOrdinal, "XamInputGetState",
-                       kXamInputImportAddress,   kXamInputImportAddress};
+        imports_[3] = {ImportKind::Function,           "xam.xex",
+                       XamOrdinal("XamInputGetState"), "XamInputGetState",
+                       kXamInputImportAddress,         kXamInputImportAddress};
         constexpr std::array<std::uint8_t, 24> FunctionCaller{
             0x7D, 0x88, 0x02, 0xA6, // mflr r12
             0x38, 0x60, 0x00, 0x07, // li r3, 7
@@ -220,14 +234,19 @@ int main()
                           .variable_resolver = RefuseVariable,
                           .variable_resolution_context = &observations},
             ImportBinding{.library = "xam.xex",
-                          .ordinal = kXamInputGetCapabilitiesOrdinal,
+                          .ordinal = XamOrdinal("XamInputGetCapabilities"),
                           .kind = ImportKind::Function},
             ImportBinding{.library = "xam.xex",
-                          .ordinal = kXamInputGetStateOrdinal,
+                          .ordinal = XamOrdinal("XamInputGetState"),
                           .kind = ImportKind::Function},
         };
-        xam_input.Bind(imported_module.ImportManifest()[2], bindings[2]);
-        xam_input.Bind(imported_module.ImportManifest()[3], bindings[3]);
+        ImportClaimTable claims;
+        Require(!claims.Resolve(xam_input.Claims()),
+                "the XAM input service did not resolve the exports it claims");
+        claims.Apply(imported_module.ImportManifest()[2], bindings[2]);
+        claims.Apply(imported_module.ImportManifest()[3], bindings[3]);
+        Require(claims.applied() == 2U,
+                "resolved XAM claims did not install both controller handlers");
         RuntimeFailure loaded = imported.context->LoadModule(imported_module, bindings);
         Require(loaded.error == RuntimeError::VariableResolutionFailed,
                 "a null variable resolution did not fail with its typed reason");

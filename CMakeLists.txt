@@ -49,6 +49,7 @@ endif()
 set(X360PORT_RUNTIME_SOURCES
     src/device_dispatch.cpp
     src/export_names.cpp
+    src/import_claims.cpp
     src/executable_invalidation.cpp
     src/guest_execution.cpp
     src/guest_fault_guard.cpp
@@ -66,6 +67,7 @@ set(X360PORT_RUNTIME_SOURCES
 )
 set(X360PORT_RUNTIME_HEADERS
     include/x360port/export_names.hpp
+    include/x360port/import_claims.hpp
     include/x360port/runtime.hpp
     include/x360port/xam_input.hpp
     src/device_dispatch.hpp

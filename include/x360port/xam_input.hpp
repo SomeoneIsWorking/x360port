@@ -1,15 +1,15 @@
 #ifndef X360PORT_XAM_INPUT_HPP
 #define X360PORT_XAM_INPUT_HPP
 
+#include "x360port/import_claims.hpp"
 #include "x360port/validation.hpp"
 
+#include <array>
 #include <cstdint>
 
 namespace x360port
 {
 
-inline constexpr std::uint32_t kXamInputGetCapabilitiesOrdinal = 400U;
-inline constexpr std::uint32_t kXamInputGetStateOrdinal = 401U;
 inline constexpr std::uint32_t kXamInputDeviceNotConnected = 0x48FU;
 inline constexpr std::uint32_t kXamInputBadArguments = 0xA0U;
 
@@ -67,9 +67,10 @@ class XamInputService final
     XamInputService(XamInputService&&) = delete;
     XamInputService& operator=(XamInputService&&) = delete;
 
-    // Bind only the platform controller state/capabilities exports. The caller owns this
-    // service for as long as the runtime may dispatch its callback.
-    void Bind(const ImportRequirement& requirement, ImportBinding& binding) noexcept;
+    // The platform controller exports this service implements. The caller owns
+    // this service for as long as the runtime may dispatch its callback, so the
+    // returned claims must not outlive it.
+    [[nodiscard]] std::array<ImportClaim, 2> Claims() noexcept;
 
   private:
     static void GetState(GuestImportContext& call, void* service) noexcept;

@@ -73,22 +73,16 @@ EncodeCapabilities(const XamPadCapabilities& capabilities) noexcept
 
 } // namespace
 
-void XamInputService::Bind(const ImportRequirement& requirement, ImportBinding& binding) noexcept
+std::array<ImportClaim, 2> XamInputService::Claims() noexcept
 {
-    if (requirement.kind != ImportKind::Function || requirement.library != "xam.xex")
-    {
-        return;
-    }
-    if (requirement.ordinal == kXamInputGetStateOrdinal)
-    {
-        binding.function_handler = GetState;
-        binding.function_context = this;
-    }
-    if (requirement.ordinal == kXamInputGetCapabilitiesOrdinal)
-    {
-        binding.function_handler = GetCapabilities;
-        binding.function_context = this;
-    }
+    return {ImportClaim{.library = ExportNames::Library::Xam,
+                        .export_name = "XamInputGetState",
+                        .handler = GetState,
+                        .context = this},
+            ImportClaim{.library = ExportNames::Library::Xam,
+                        .export_name = "XamInputGetCapabilities",
+                        .handler = GetCapabilities,
+                        .context = this}};
 }
 
 void XamInputService::GetState(GuestImportContext& call, void* service) noexcept
