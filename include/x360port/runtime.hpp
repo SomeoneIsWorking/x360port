@@ -37,6 +37,7 @@ enum class RuntimeError : std::uint8_t
     ExecutionBudgetInvalid,
     ExecutionBudgetExceeded,
     ExecutionInvalidated,
+    GuestAccessViolation,
     ImportServiceRefused,
     ExecutionFailed,
     OverrideInvalid,
@@ -117,13 +118,16 @@ struct JitStatistics
     std::uint64_t interpreter_fallback_unsupported = 0;
     std::uint64_t interpreter_fallback_memory_failures = 0;
     std::uint64_t interpreter_fallback_budget_exhaustions = 0;
+    std::uint64_t guest_access_violations = 0;
 };
 
 struct ExecutionLimits
 {
     // Counts translated guest basic-block entries across nested guest calls.
     // A zero limit is invalid; the default is intentionally finite so a guest
-    // path that never returns cannot strand the embedding thread.
+    // path that never returns cannot strand the embedding thread. The budget
+    // is decremented at block entry, so it cannot bound an instruction that
+    // faults repeatedly; GuestFaultGuard terminates that call instead.
     std::uint64_t max_guest_blocks = 1'000'000;
     // Bounds the fallback when JIT compilation refuses.
     std::uint64_t max_interpreter_instructions = 100'000;

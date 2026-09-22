@@ -50,6 +50,7 @@ set(X360PORT_RUNTIME_SOURCES
     src/device_dispatch.cpp
     src/executable_invalidation.cpp
     src/guest_execution.cpp
+    src/guest_fault_guard.cpp
     src/guest_memory.cpp
     src/interpreter_fallback.cpp
     src/override_dispatch.cpp
