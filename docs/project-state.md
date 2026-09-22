@@ -24,7 +24,7 @@ static or interpreter product path.
 | S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
 | S015 | Checked XEX2 inspection and canonical normalized-image output | verified | S001, S002, S003, S004 | G001, G002 |
 | S016 | XAM controller state/capabilities imports use title-supplied device data | verified | S008, S011 | G001 |
-| S017 | Kernel/XAM ordinals resolve to exported names for binding | verified | S002 | G001, G002 |
+| S017 | Host services claim kernel/XAM imports by exported name | verified | S002, S008 | G001, G002 |
 
 ## Current focus
 
@@ -280,7 +280,7 @@ type/subtype/flags, supported gamepad, and vibration record, disconnected zeroin
 null-pointer bad-arguments result, and typed refusal of invalid guest memory.
 The consumer owns controller-source arbitration, capability policy, and user slots.
 
-### S017 — export-name resolution
+### S017 — named import claiming
 
 Evidence: `tests/export_name_tests.cpp` resolves 922 `xboxkrnl.exe` and 1736 `xam.xex`
 exports from the vendored Xenia ordinal tables in both directions, checks the kind of a
@@ -289,3 +289,12 @@ unexported ordinal, a misspelled export name, and a kernel export requested thro
 XAM library each to refuse. The populated counts are asserted before the negatives so an
 empty table cannot pass. Ordinal `0xCC`/`NtAllocateVirtualMemory` and ordinal 971/
 `XGetAVPack` are checked against bindings recorded outside this table.
+
+The same test resolves a two-service claim table, installs a handler for the matching
+manifest entry, leaves an unclaimed entry untouched, and requires a misspelled export
+name, an export two services both claim, a handler on a variable export, and a claim
+with no handler each to refuse with its own reason. Resolution commits nothing when any
+claim is refused; the first shape of it left the claims preceding the refusal installed,
+which the partial-state assertion caught. `XamInputService` now claims its two exports by
+name instead of exposing ordinal constants, and the synthetic import manifest asks the
+export table for those ordinals rather than repeating them.
