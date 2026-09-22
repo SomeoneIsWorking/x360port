@@ -82,6 +82,18 @@ struct SystemFrameImage
 
 struct SystemSessionCreateResult;
 
+// Execution accounting for a launched session. Every guest function runs as
+// Xenia-translated host code: the system session has no interpreter fallback,
+// so a function Xenia cannot translate is counted in translation_failures and
+// its guest call fails rather than running some other way.
+struct SystemExecutionCounts
+{
+    std::uint64_t translated_functions = 0;
+    std::uint64_t translation_failures = 0;
+    std::uint64_t host_code_bytes = 0;
+    std::uint64_t native_override_calls = 0;
+};
+
 // The complete console: Xenia's memory, dynarec processor, kernel and XAM
 // services, file system, audio, GPU, and input, composed around one title and
 // its native overrides. This is the gameplay product; RuntimeContext remains
@@ -114,7 +126,7 @@ class SystemSession final
     // empty image, before the title has presented.
     [[nodiscard]] RuntimeFailure CaptureGuestOutput(SystemFrameImage& image) const;
 
-    [[nodiscard]] std::uint64_t NativeOverrideCalls() const noexcept;
+    [[nodiscard]] SystemExecutionCounts ExecutionCounts() const noexcept;
 
     // Ends the process. Xenia cannot tear down a title whose guest threads are
     // running, so once Launch has succeeded this is the only way a session
