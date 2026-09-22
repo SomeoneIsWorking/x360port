@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "xenia/apu/sdl/sdl_audio_system.h"
+#include "xenia/base/cvar.h"
 #include "xenia/base/logging.h"
 #include "xenia/cpu/processor.h"
 #include "xenia/cpu/xex_module.h"
@@ -26,6 +27,8 @@
 #include "xenia/kernel/user_module.h"
 #include "xenia/kernel/xthread.h"
 #include "xenia/ui/presenter.h"
+
+DECLARE_path(log_file);
 
 namespace x360port
 {
@@ -62,8 +65,10 @@ using xe::X_STATUS;
 
 } // namespace
 
-XeniaLoggingScope::XeniaLoggingScope(const std::string& application_name)
+XeniaLoggingScope::XeniaLoggingScope(const std::string& application_name,
+                                     const std::filesystem::path& log_path)
 {
+    cvars::log_file = log_path;
     xe::InitializeLogging(application_name);
 }
 
@@ -137,7 +142,8 @@ RuntimeFailure SystemSession::Impl::Initialize(xe::ui::Window* window)
         return Failure(RuntimeError::MemoryInitializationFailed,
                        "the storage root could not be created: " + directory_error.message());
     }
-    logging_.emplace(config_.application_name);
+    logging_.emplace(config_.application_name,
+                     config_.storage_root / "logs" / (config_.application_name + ".log"));
 
     if (config_.audio == SystemAudio::Silent)
     {
@@ -253,6 +259,9 @@ RuntimeFailure SystemSession::Impl::ActivateTitle(std::uint32_t title_id)
             return failure;
         }
     }
+    XELOGI("x360port: title 0x{:08X} verified; {} native overrides installed in .text "
+           "[0x{:08X}, 0x{:08X})",
+           title_id, config_.overrides.size(), text->address, text->address + text->size);
     return {};
 }
 
