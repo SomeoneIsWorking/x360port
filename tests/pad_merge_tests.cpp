@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "pad_merge.hpp"
 
 #include <cstdlib>
@@ -81,9 +82,7 @@ void PacketAdvancesExactlyOnChange()
             "a changed pad did not advance the packet number");
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     NeitherDeviceIsNoPad();
     OneDeviceAnswersAlone();
@@ -92,3 +91,7 @@ int main()
     std::cout << "pad_merge_tests: 4 cases passed\n";
     return EXIT_SUCCESS;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("pad_merge_tests", RunTests); }

@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/runtime.hpp"
 
 #include "synthetic_module.hpp"
@@ -8,6 +9,7 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <iostream>
+#include <new>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -61,7 +63,16 @@ ExecutionResult AddOneThroughOriginal(GuestCallContext& call, GuestAddress addre
 ExecutionResult RefuseOverride(GuestCallContext&, GuestAddress, std::span<const std::uint64_t>,
                                void*) noexcept
 {
-    return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};
+    try
+    {
+        return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};
+    }
+    catch (const std::bad_alloc&)
+    {
+        // The refusal stands without its detail; the test then reports the
+        // missing detail instead of the override terminating the process.
+        return {{RuntimeError::ExecutionFailed, {}}, 0};
+    }
 }
 
 [[noreturn]] void Fail(std::string_view message)
@@ -78,9 +89,7 @@ void Require(bool condition, std::string_view message)
     }
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     RuntimeCreateResult created = RuntimeContext::Create();
     Require(static_cast<bool>(created), created.failure.detail);
@@ -440,3 +449,7 @@ int main()
                  "calls, overrides, device memory, and executable invalidation\n";
     return 0;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("runtime_tests", RunTests); }

@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/import_claims.hpp"
 #include "x360port/runtime.hpp"
 
@@ -202,9 +203,7 @@ class ArgumentBlock final
     return words;
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     RuntimeCreateResult created = RuntimeContext::Create();
     Require(static_cast<bool>(created), created.failure.detail);
@@ -373,3 +372,7 @@ int main()
                  "paths crossed Xenia's export machinery and its own heaps\n";
     return 0;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("kernel_memory_tests", RunTests); }

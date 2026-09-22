@@ -1,3 +1,4 @@
+#include "guarded_main.hpp"
 #include "x360port/export_names.hpp"
 #include "x360port/import_claims.hpp"
 
@@ -46,9 +47,7 @@ void RequireClaimRefusal(std::span<const ImportClaim> claims, std::string_view e
     Require(table.size() == 0U, "a refused claim table retained resolved claims");
 }
 
-} // namespace
-
-int main()
+[[nodiscard]] int RunTests()
 {
     // A table that silently resolved nothing would pass every negative below,
     // so the populated case is asserted first and with a denominator.
@@ -151,3 +150,7 @@ int main()
                  "variable, or handlerless export\n";
     return 0;
 }
+
+} // namespace
+
+int main() { return x360port::tests::GuardedMain("export_name_tests", RunTests); }
