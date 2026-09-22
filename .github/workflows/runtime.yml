@@ -8,8 +8,6 @@ on:
 permissions:
   contents: read
 
-env:
-
 jobs:
   native-runtime:
     name: ${{ matrix.name }}
@@ -61,7 +59,7 @@ jobs:
         if: runner.os == 'Linux'
         run: >-
           sudo apt-get update &&
-          sudo apt-get install --yes libgtk-3-dev liblz4-dev libsdl2-dev libx11-xcb-dev
+          sudo apt-get install --yes libfontconfig-dev libgtk-3-dev liblz4-dev libsdl2-dev libx11-xcb-dev
 
       - name: Install pinned LLVM
         uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0
