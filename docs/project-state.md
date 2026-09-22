@@ -342,6 +342,13 @@ translated, failed to translate, and the host code they emitted, counted at
 so a translation failure is a failed guest call, not a slower one. The Gears 1 product's
 headless run records 10,996 functions translated to 24.8 MB of host code with 0 failures
 over 60 s.
+Host SDL gamepads and the title's controller source are one controller: `PadMerger` ORs
+buttons, takes each trigger's further-pressed device and each stick whole from the device
+deflecting it further, and advances the packet number only on a change
+(`x360port_pad_merge`). A windowed session given a `DesktopInputState` captures the
+window's keyboard and mouse into it for the title to map (`x360port_desktop_input` covers
+the state's travel and capture contract); the GTK capture itself is exercised only by a
+person at the window.
 
 Gaps: the windowed host exists only for Linux/GTK; the Windows and macOS hosts remain. Xenia
 cannot tear down a running title, so a launched session ends only through

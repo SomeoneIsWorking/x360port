@@ -47,6 +47,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 set(X360PORT_RUNTIME_SOURCES
+    src/desktop_input.cpp
     src/device_dispatch.cpp
     src/export_names.cpp
     src/import_claims.cpp
@@ -69,6 +70,7 @@ set(X360PORT_RUNTIME_SOURCES
     src/xex_inspect.cpp
 )
 set(X360PORT_RUNTIME_HEADERS
+    include/x360port/desktop_input.hpp
     include/x360port/export_names.hpp
     include/x360port/guest_call.hpp
     include/x360port/import_claims.hpp
@@ -94,6 +96,8 @@ set(X360PORT_RUNTIME_HEADERS
     include/x360port/xex_inspect.hpp
 )
 set(X360PORT_SYSTEM_SOURCES
+    src/system/desktop_capture_gtk.cpp
+    src/system/pad_merge.cpp
     src/system/system_call_context.cpp
     src/system/system_input_driver.cpp
     src/system/system_session.cpp
@@ -101,6 +105,8 @@ set(X360PORT_SYSTEM_SOURCES
 )
 set(X360PORT_SYSTEM_HEADERS
     include/x360port/system_session.hpp
+    src/system/desktop_capture_gtk.hpp
+    src/system/pad_merge.hpp
     src/system/system_call_context.hpp
     src/system/system_input_driver.hpp
     src/system/system_session_impl.hpp
@@ -255,6 +261,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         x360port_enable_warnings(x360port_export_name_tests)
         add_test(NAME export_names COMMAND x360port_export_name_tests)
 
+        add_executable(x360port_desktop_input_tests tests/desktop_input_tests.cpp)
+        target_link_libraries(x360port_desktop_input_tests PRIVATE x360port)
+        x360port_enable_warnings(x360port_desktop_input_tests)
+        add_test(NAME desktop_input COMMAND x360port_desktop_input_tests)
+
         add_executable(x360port_xex_inspect_tests tests/xex_inspect_tests.cpp)
         target_link_libraries(x360port_xex_inspect_tests PRIVATE x360port)
         x360port_enable_warnings(x360port_xex_inspect_tests)
@@ -265,6 +276,12 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             target_link_libraries(x360port_system_config_tests PRIVATE x360port_system)
             x360port_enable_warnings(x360port_system_config_tests)
             add_test(NAME system_config COMMAND x360port_system_config_tests)
+
+            add_executable(x360port_pad_merge_tests tests/pad_merge_tests.cpp)
+            target_include_directories(x360port_pad_merge_tests PRIVATE src/system)
+            target_link_libraries(x360port_pad_merge_tests PRIVATE x360port_system)
+            x360port_enable_warnings(x360port_pad_merge_tests)
+            add_test(NAME pad_merge COMMAND x360port_pad_merge_tests)
         endif()
     endif()
 
@@ -278,9 +295,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 ${X360PORT_SYSTEM_SOURCES}
                 ${X360PORT_SYSTEM_HEADERS}
                 tests/contract_tests.cpp
+                tests/desktop_input_tests.cpp
                 tests/export_name_tests.cpp
                 tests/import_runtime_tests.cpp
                 tests/kernel_memory_tests.cpp
+                tests/pad_merge_tests.cpp
                 tests/system_config_tests.cpp
                 tests/runtime_tests.cpp
                 tests/xex_inspect_tests.cpp
@@ -301,6 +320,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
                     --warnings-as-errors=*
                     ${X360PORT_RUNTIME_SOURCES}
+                    tests/desktop_input_tests.cpp
                     tests/export_name_tests.cpp
                     tests/import_runtime_tests.cpp
                     tests/kernel_memory_tests.cpp
@@ -314,6 +334,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
                         --warnings-as-errors=*
                         ${X360PORT_SYSTEM_SOURCES}
+                        tests/pad_merge_tests.cpp
                         tests/system_config_tests.cpp
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         endif()
