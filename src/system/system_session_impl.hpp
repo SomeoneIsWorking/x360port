@@ -60,7 +60,7 @@ class SystemSession::Impl final
 
     [[nodiscard]] std::uint64_t PresentedFrameCount() const noexcept;
     [[nodiscard]] RuntimeFailure CaptureGuestOutput(SystemFrameImage& image) const;
-    [[nodiscard]] std::uint64_t NativeOverrideCalls() const noexcept;
+    [[nodiscard]] SystemExecutionCounts ExecutionCounts() const noexcept;
 
     [[nodiscard]] xe::Emulator& Emulator() const noexcept { return *emulator_; }
     [[nodiscard]] const SystemSessionConfig& Config() const noexcept { return config_; }

@@ -310,10 +310,16 @@ RuntimeFailure SystemSession::Impl::CaptureGuestOutput(SystemFrameImage& image) 
     return {};
 }
 
-std::uint64_t SystemSession::Impl::NativeOverrideCalls() const noexcept
+SystemExecutionCounts SystemSession::Impl::ExecutionCounts() const noexcept
 {
-    return std::atomic_ref<std::uint64_t>(statistics_.native_override_calls)
-        .load(std::memory_order_relaxed);
+    const xe::cpu::TranslationCounts translation = emulator_->processor()->translation_counts();
+    return {
+        .translated_functions = translation.defined_functions,
+        .translation_failures = translation.failed_functions,
+        .host_code_bytes = translation.host_code_bytes,
+        .native_override_calls = std::atomic_ref<std::uint64_t>(statistics_.native_override_calls)
+                                     .load(std::memory_order_relaxed),
+    };
 }
 
 void SystemSession::EndProcess(int status) noexcept
@@ -348,9 +354,9 @@ RuntimeFailure SystemSession::CaptureGuestOutput(SystemFrameImage& image) const
     return impl_->CaptureGuestOutput(image);
 }
 
-std::uint64_t SystemSession::NativeOverrideCalls() const noexcept
+SystemExecutionCounts SystemSession::ExecutionCounts() const noexcept
 {
-    return impl_->NativeOverrideCalls();
+    return impl_->ExecutionCounts();
 }
 
 } // namespace x360port
