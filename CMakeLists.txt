@@ -17,7 +17,11 @@ option(X360PORT_VALIDATION_ONLY
        OFF)
 set(X360PORT_XENIA_SOURCE_DIR "" CACHE PATH
     "Path to the pinned Xenia source checkout used by the x360port executor")
-set(X360PORT_XENIA_REVISION "b7b471a66120932ef3f738e004233061db6127a5")
+# dependencies.json is the only authority for the pinned Xenia revision; the
+# workflow and tooling read the same file through tools/dependency_pin.py.
+file(READ "${CMAKE_CURRENT_LIST_DIR}/dependencies.json" X360PORT_DEPENDENCIES_JSON)
+string(JSON X360PORT_XENIA_REVISION GET "${X360PORT_DEPENDENCIES_JSON}" xenia revision)
+string(JSON X360PORT_XENIA_REPOSITORY GET "${X360PORT_DEPENDENCIES_JSON}" xenia repository)
 
 set(X360PORT_VALIDATION_SOURCES
     src/digest.cpp

@@ -9,7 +9,6 @@ permissions:
   contents: read
 
 env:
-  XENIA_REVISION: b7b471a66120932ef3f738e004233061db6127a5
 
 jobs:
   native-runtime:
@@ -39,11 +38,20 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Read pinned dependency revisions
+        id: pins
+        shell: bash
+        run: |
+          python3 tools/dependency_pin.py --name xenia --field repository \
+            | sed 's/^/repository=/' >> "$GITHUB_OUTPUT"
+          python3 tools/dependency_pin.py --name xenia --field revision \
+            | sed 's/^/revision=/' >> "$GITHUB_OUTPUT"
+
       - name: Check out pinned Xenia fork
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          repository: SomeoneIsWorking/xenia-canary
-          ref: ${{ env.XENIA_REVISION }}
+          repository: ${{ steps.pins.outputs.repository }}
+          ref: ${{ steps.pins.outputs.revision }}
           path: build/deps/xenia
           fetch-depth: 0
           persist-credentials: false
