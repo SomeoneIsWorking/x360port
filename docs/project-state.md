@@ -119,7 +119,7 @@ callee returning 17. `CallOriginal` re-enters the translated body without
 recursion; callee invalidation retains the redirect, a failing native callback
 exits with its typed failure, and removal restores the cached caller's original
 result. The x64 synthetic runtime gate and Clang-Tidy pass at Xenia
-`b7b471a66120932ef3f738e004233061db6127a5`. Gears' headless
+the revision pinned in `dependencies.json`. Gears' headless
 profile-authenticated AddRef discriminator at `0x82233668` also proves that a
 nested real-image guest call enters the override and returns to the original
 guest path after removal (Gears commit `568b918`).
