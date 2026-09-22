@@ -210,7 +210,7 @@ if(NOT X360PORT_VALIDATION_ONLY)
         # outside its group, here through xenia-ui-vulkan.
         target_link_libraries(x360port_system PUBLIC
             x360port
-            xenia-apu-sdl xenia-apu xenia-gpu-vulkan xenia-ui-vulkan xenia-hid xenia-vfs
+            xenia-apu-sdl xenia-apu xenia-gpu-vulkan xenia-ui-vulkan xenia-hid-sdl xenia-hid xenia-vfs
             PkgConfig::X360PORT_GTK3)
         # Xenia's SDL2 interface is ordinary, so its headers would be checked
         # as first-party code; they are a dependency's.
