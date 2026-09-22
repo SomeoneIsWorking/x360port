@@ -6,12 +6,18 @@
 #include "system_call_context.hpp"
 #include "x360port/system_session.hpp"
 
+#include <cstddef>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace xe
 {
 class Emulator;
+namespace hid
+{
+class InputDriver;
+}
 namespace ui
 {
 class Window;
@@ -57,7 +63,13 @@ class SystemSession::Impl final
     [[nodiscard]] const SystemSessionConfig& Config() const noexcept { return config_; }
 
   private:
+    // Window listeners are ordered by z; host input sits above the window's
+    // own shortcuts, as Xenia's application places it.
+    static constexpr std::size_t kHostInputZOrder = 1;
+
     [[nodiscard]] RuntimeFailure ValidateConfig() const;
+    [[nodiscard]] std::vector<std::unique_ptr<xe::hid::InputDriver>>
+    CreateInputDrivers(xe::ui::Window* window);
     // Runs on the launching thread after the module is loaded and before its
     // main thread resumes.
     void OnLaunch(std::uint32_t title_id);
@@ -74,6 +86,7 @@ class SystemSession::Impl final
     // Guest threads bump the override counter through atomic_ref; a const
     // reader must be able to form one too.
     mutable JitStatistics statistics_{};
+    RuntimeFailure input_failure_;
     RuntimeFailure activation_failure_;
     bool launched_ = false;
 };

@@ -21,6 +21,7 @@
 #include "xenia/gpu/graphics_system.h"
 #include "xenia/gpu/vulkan/vulkan_graphics_system.h"
 #include "xenia/hid/input_driver.h"
+#include "xenia/hid/sdl/sdl_hid.h"
 #include "xenia/kernel/kernel_state.h"
 #include "xenia/kernel/user_module.h"
 #include "xenia/kernel/xthread.h"
@@ -151,26 +152,48 @@ RuntimeFailure SystemSession::Impl::Initialize(xe::ui::Window* window)
     emulator_->on_launch.AddListener([this](std::uint32_t title_id, std::string_view)
                                      { OnLaunch(title_id); });
 
-    const SystemInputSource input = config_.input;
     const X_STATUS setup = emulator_->Setup(
         window, nullptr, true, window == nullptr, xe::apu::sdl::SDLAudioSystem::Create,
         []() -> std::unique_ptr<xe::gpu::GraphicsSystem>
         { return std::make_unique<xe::gpu::vulkan::VulkanGraphicsSystem>(); },
-        [input](xe::ui::Window*)
-        {
-            std::vector<std::unique_ptr<xe::hid::InputDriver>> drivers;
-            drivers.push_back(CreateSystemInputDriver(input));
-            return drivers;
-        });
+        [this](xe::ui::Window* input_window) { return CreateInputDrivers(input_window); });
     if (XFAILED(setup))
     {
         return Failure(RuntimeError::BackendInitializationFailed,
                        "Xenia refused to compose the console: status 0x" + HexWord(setup));
     }
+    if (input_failure_)
+    {
+        return input_failure_;
+    }
     call_context_.emplace(*emulator_->memory(), *emulator_->processor());
     overrides_.Bind(*emulator_->processor(), *call_context_, statistics_,
                     EndTitleAfterOverrideFailure);
     return {};
+}
+
+std::vector<std::unique_ptr<xe::hid::InputDriver>>
+SystemSession::Impl::CreateInputDrivers(xe::ui::Window* window)
+{
+    // Xenia asks its drivers in order and takes the first connected pad, so
+    // the title's source outranks the host's whenever it reports one.
+    std::vector<std::unique_ptr<xe::hid::InputDriver>> drivers;
+    drivers.push_back(CreateSystemInputDriver(config_.input));
+    if (config_.host_input == SystemHostInput::Gamepads)
+    {
+        std::unique_ptr<xe::hid::InputDriver> gamepads =
+            xe::hid::sdl::Create(window, kHostInputZOrder);
+        const X_STATUS status = gamepads->Setup();
+        if (XFAILED(status))
+        {
+            input_failure_ =
+                Failure(RuntimeError::BackendInitializationFailed,
+                        "the host gamepad driver refused to start: status 0x" + HexWord(status));
+            return drivers;
+        }
+        drivers.push_back(std::move(gamepads));
+    }
+    return drivers;
 }
 
 RuntimeFailure SystemSession::Impl::Launch()

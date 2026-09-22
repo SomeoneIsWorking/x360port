@@ -41,6 +41,15 @@ struct SystemInputSource
     void* context = nullptr;
 };
 
+// Host controllers the console reads when the title's own source reports no
+// pad. A measured or scripted run selects None so a controller plugged into the
+// machine cannot change what the run observes.
+enum class SystemHostInput : std::uint8_t
+{
+    None,
+    Gamepads,
+};
+
 struct SystemSessionConfig
 {
     // Shown as the window title and used to name the session's log.
@@ -55,7 +64,9 @@ struct SystemSessionConfig
     // runs. Zero is refused: a session always states which title it expects.
     std::uint32_t expected_title_id = 0;
     SystemAudio audio = SystemAudio::Device;
+    // Asked first; while it reports no pad, the host input below answers.
     SystemInputSource input;
+    SystemHostInput host_input = SystemHostInput::None;
     // Installed after the module is mapped and before its main thread resumes.
     std::vector<SystemOverride> overrides;
 };
