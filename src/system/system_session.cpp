@@ -181,24 +181,24 @@ RuntimeFailure SystemSession::Impl::Initialize(xe::ui::Window* window)
 std::vector<std::unique_ptr<xe::hid::InputDriver>>
 SystemSession::Impl::CreateInputDrivers(xe::ui::Window* window)
 {
-    // Xenia asks its drivers in order and takes the first connected pad, so
-    // the title's source outranks the host's whenever it reports one.
-    std::vector<std::unique_ptr<xe::hid::InputDriver>> drivers;
-    drivers.push_back(CreateSystemInputDriver(config_.input));
+    // One driver answers the console: Xenia asks its drivers in order and
+    // takes the first connected pad, which would silence a host gamepad
+    // whenever the title's source reports one. The system driver merges them.
+    std::unique_ptr<xe::hid::InputDriver> gamepads;
     if (config_.host_input == SystemHostInput::Gamepads)
     {
-        std::unique_ptr<xe::hid::InputDriver> gamepads =
-            xe::hid::sdl::Create(window, kHostInputZOrder);
+        gamepads = xe::hid::sdl::Create(window, kHostInputZOrder);
         const X_STATUS status = gamepads->Setup();
         if (XFAILED(status))
         {
             input_failure_ =
                 Failure(RuntimeError::BackendInitializationFailed,
                         "the host gamepad driver refused to start: status 0x" + HexWord(status));
-            return drivers;
+            return {};
         }
-        drivers.push_back(std::move(gamepads));
     }
+    std::vector<std::unique_ptr<xe::hid::InputDriver>> drivers;
+    drivers.push_back(CreateSystemInputDriver(config_.input, std::move(gamepads)));
     return drivers;
 }
 

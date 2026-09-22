@@ -1,10 +1,13 @@
 #include "system_session_impl.hpp"
 
+#include "desktop_capture_gtk.hpp"
+
 #include <gtk/gtk.h>
 
 #include <atomic>
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <thread>
 #include <utility>
 
@@ -22,9 +25,10 @@ namespace
 
 constexpr std::uint32_t kInitialWidth = 1280;
 constexpr std::uint32_t kInitialHeight = 720;
-// Keyboard focus priority for the window's own shortcuts; the title's input
-// arrives through its controller readers, not through this listener.
+// Keyboard focus priority for the window's own shortcuts, which come before the
+// title's desktop input so F11 and Alt+Enter never reach the game.
 constexpr std::size_t kShortcutZOrder = 0;
+constexpr std::size_t kDesktopInputZOrder = 1;
 
 // Closing the window is the player quitting the game.
 class QuitOnClose final : public xe::ui::WindowListener
@@ -87,6 +91,13 @@ RuntimeFailure RunWindowedSystem(SystemSessionConfig config)
     FullscreenShortcut fullscreen(*window);
     window->AddListener(&quit_on_close);
     window->AddInputListener(&fullscreen, kShortcutZOrder);
+    std::optional<DesktopInputCapture> desktop_input;
+    if (config.desktop_input != nullptr)
+    {
+        desktop_input.emplace(*window, *config.desktop_input);
+        window->AddListener(&*desktop_input);
+        window->AddInputListener(&*desktop_input, kDesktopInputZOrder);
+    }
     if (!window->Open())
     {
         return RuntimeFailure{RuntimeError::BackendInitializationFailed,
@@ -127,6 +138,11 @@ RuntimeFailure RunWindowedSystem(SystemSessionConfig config)
         // it, so the thread has finished and nothing guest-side ran.
         emulator_thread.join();
         window->SetPresenter(nullptr);
+        if (desktop_input)
+        {
+            window->RemoveInputListener(&*desktop_input);
+            window->RemoveListener(&*desktop_input);
+        }
         return failure;
     }
     // The player closed the window or the title exited. Guest threads are

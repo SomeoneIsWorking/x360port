@@ -1,6 +1,7 @@
 #ifndef X360PORT_SYSTEM_SESSION_HPP
 #define X360PORT_SYSTEM_SESSION_HPP
 
+#include "x360port/desktop_input.hpp"
 #include "x360port/guest_call.hpp"
 #include "x360port/runtime_failure.hpp"
 #include "x360port/xam_input.hpp"
@@ -41,9 +42,9 @@ struct SystemInputSource
     void* context = nullptr;
 };
 
-// Host controllers the console reads when the title's own source reports no
-// pad. A measured or scripted run selects None so a controller plugged into the
-// machine cannot change what the run observes.
+// Host controllers merged with the title's own source, so either drives the
+// game. A measured or scripted run selects None so a controller plugged into
+// the machine cannot change what the run observes.
 enum class SystemHostInput : std::uint8_t
 {
     None,
@@ -67,6 +68,11 @@ struct SystemSessionConfig
     // Asked first; while it reports no pad, the host input below answers.
     SystemInputSource input;
     SystemHostInput host_input = SystemHostInput::None;
+    // Where the game window reports its keyboard and mouse, for the title's
+    // source to read. Title-owned and alive for the whole session; null leaves
+    // the desktop devices out of the game. An offscreen session has no window
+    // and never writes to it.
+    DesktopInputState* desktop_input = nullptr;
     // Installed after the module is mapped and before its main thread resumes.
     std::vector<SystemOverride> overrides;
 };
