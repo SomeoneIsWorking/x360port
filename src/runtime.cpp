@@ -3,7 +3,9 @@
 #include "device_dispatch.hpp"
 #include "executable_invalidation.hpp"
 #include "guest_execution.hpp"
+#include "guest_fault_guard.hpp"
 #include "guest_memory.hpp"
+#include "guest_range_reservation.hpp"
 #include "interpreter_fallback.hpp"
 #include "override_dispatch.hpp"
 #include "runtime_imports.hpp"
@@ -39,32 +41,6 @@ bool g_instance_active = false;
     return RuntimeFailure{error, std::move(detail)};
 }
 
-class GuestRangeReservation final
-{
-  public:
-    GuestRangeReservation(xe::BaseHeap& heap, std::uint32_t address) noexcept
-        : heap_(&heap), address_(address)
-    {
-    }
-
-    GuestRangeReservation(const GuestRangeReservation&) = delete;
-    GuestRangeReservation& operator=(const GuestRangeReservation&) = delete;
-
-    ~GuestRangeReservation()
-    {
-        if (heap_ != nullptr)
-        {
-            static_cast<void>(heap_->Release(address_));
-        }
-    }
-
-    void Commit() noexcept { heap_ = nullptr; }
-
-  private:
-    xe::BaseHeap* heap_;
-    std::uint32_t address_;
-};
-
 } // namespace
 
 class RuntimeContext::Impl final
@@ -85,6 +61,9 @@ class RuntimeContext::Impl final
         {
             memory_->SystemHeapFree(pcr_address_);
         }
+        // The guard holds the processor's code cache and an installed handler,
+        // so it is torn down before the processor it observes.
+        fault_guard_.reset();
         processor_.reset();
         if (memory_ != nullptr && image_address_ != 0)
         {
@@ -135,6 +114,11 @@ class RuntimeContext::Impl final
             return Failure(RuntimeError::BackendInitializationFailed,
                            "Xenia Processor::Setup refused the host dynarec backend");
         }
+
+        // Installed after Processor::Setup so Xenia's own MMIO and write-watch
+        // handlers stay ahead of it in the chain and keep the faults they own.
+        fault_guard_ =
+            std::make_unique<GuestFaultGuard>(*processor_->backend()->code_cache(), *memory_);
 
         stack_address_ = memory_->SystemHeapAlloc(kStackSize);
         if (stack_address_ == 0)
@@ -360,6 +344,10 @@ class RuntimeContext::Impl final
         {
             ++statistics_.import_service_refusals;
         }
+        if (result.failure.error == RuntimeError::GuestAccessViolation)
+        {
+            ++statistics_.guest_access_violations;
+        }
         if (result)
         {
             ++statistics_.execution_calls;
@@ -390,6 +378,7 @@ class RuntimeContext::Impl final
     std::unique_ptr<xe::cpu::ExportResolver> export_resolver_;
     std::unique_ptr<xe::cpu::Processor> processor_;
     std::unique_ptr<xe::cpu::ThreadState> thread_state_;
+    std::unique_ptr<GuestFaultGuard> fault_guard_;
     std::unique_ptr<ExecutableInvalidation> invalidation_;
     std::unique_ptr<RuntimeImports> imports_;
     xe::cpu::RawModule* module_ = nullptr;

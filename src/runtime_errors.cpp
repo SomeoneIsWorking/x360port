@@ -49,6 +49,8 @@ std::string_view ToString(RuntimeError error) noexcept
         return "guest execution block budget exceeded";
     case RuntimeError::ExecutionInvalidated:
         return "guest execution invalidated by executable write";
+    case RuntimeError::GuestAccessViolation:
+        return "guest execution faulted on inaccessible guest memory";
     case RuntimeError::ImportServiceRefused:
         return "host import service refused guest execution";
     case RuntimeError::ExecutionFailed:

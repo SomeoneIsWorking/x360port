@@ -20,6 +20,17 @@ namespace
 constexpr std::uint32_t kReturnAddress = 0xBCBCBCBC;
 constexpr std::size_t kRegisterArgumentCount = 8;
 
+[[nodiscard]] std::string FormatGuestAddress(std::uint32_t address)
+{
+    constexpr std::string_view kDigits = "0123456789ABCDEF";
+    std::string text(8, '0');
+    for (std::size_t index = 0; index < text.size(); ++index)
+    {
+        text[text.size() - index - 1] = kDigits[(address >> (index * 4)) & 0xFU];
+    }
+    return text;
+}
+
 [[nodiscard]] std::string_view RefusalReasonText(ImportRefusalReason reason) noexcept
 {
     switch (reason)
@@ -104,6 +115,15 @@ ExecutionResult ExecuteGuestFunction(xe::cpu::Function& function,
             xe::cpu::ppc::GuestExecutionExitReason::kNativeOverrideFailed)
         {
             return {std::move(override_failure), 0};
+        }
+        if (execution_budget.exit_reason ==
+            xe::cpu::ppc::GuestExecutionExitReason::kGuestAccessViolation)
+        {
+            std::string detail = "guest execution faulted ";
+            detail += execution_budget.fault_was_write ? "writing" : "reading";
+            detail += " guest address 0x";
+            detail += FormatGuestAddress(execution_budget.fault_guest_address);
+            return {RuntimeFailure{RuntimeError::GuestAccessViolation, std::move(detail)}, 0};
         }
         if (execution_budget.exit_reason ==
             xe::cpu::ppc::GuestExecutionExitReason::kBlockBudgetExceeded)
