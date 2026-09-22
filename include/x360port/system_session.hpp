@@ -51,6 +51,11 @@ enum class SystemHostInput : std::uint8_t
     Gamepads,
 };
 
+// The Xbox 360's own display refresh, and the vblank rates a session accepts.
+inline constexpr std::uint32_t kConsoleDisplayRefreshHz = 60;
+inline constexpr std::uint32_t kMinDisplayRefreshHz = 1;
+inline constexpr std::uint32_t kMaxDisplayRefreshHz = 1000;
+
 struct SystemSessionConfig
 {
     // Shown as the window title and used to name the session's log.
@@ -73,6 +78,15 @@ struct SystemSessionConfig
     // the desktop devices out of the game. An offscreen session has no window
     // and never writes to it.
     DesktopInputState* desktop_input = nullptr;
+    // The console's vertical-blank rate, in the refusal-checked range
+    // [kMinDisplayRefreshHz, kMaxDisplayRefreshHz]. A title that presents on
+    // every Nth vblank presents at display_refresh_hz / N frames per second;
+    // whether its game clock follows the vblank or the host clock is the
+    // title's property, for its adapter to establish before raising this.
+    std::uint32_t display_refresh_hz = kConsoleDisplayRefreshHz;
+    // Appends each translated guest function to /tmp/perf-<pid>.map, the
+    // symbol file Linux perf reads for JIT code. Diagnostic; Linux only.
+    bool write_perf_map = false;
     // Installed after the module is mapped and before its main thread resumes.
     std::vector<SystemOverride> overrides;
 };

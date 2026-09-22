@@ -15,10 +15,12 @@
 #include "xenia/apu/sdl/sdl_audio_system.h"
 #include "xenia/base/cvar.h"
 #include "xenia/base/logging.h"
+#include "xenia/cpu/cpu_flags.h"
 #include "xenia/cpu/processor.h"
 #include "xenia/cpu/xex_module.h"
 #include "xenia/emulator.h"
 #include "xenia/gpu/command_processor.h"
+#include "xenia/gpu/gpu_flags.h"
 #include "xenia/gpu/graphics_system.h"
 #include "xenia/gpu/vulkan/vulkan_graphics_system.h"
 #include "xenia/hid/input_driver.h"
@@ -112,6 +114,15 @@ RuntimeFailure SystemSession::Impl::ValidateConfig() const
         return Failure(RuntimeError::ImportValidationFailed,
                        "a system session requires both controller readers");
     }
+    if (config_.display_refresh_hz < kMinDisplayRefreshHz ||
+        config_.display_refresh_hz > kMaxDisplayRefreshHz)
+    {
+        return Failure(RuntimeError::BackendInitializationFailed,
+                       "the display refresh must be between " +
+                           std::to_string(kMinDisplayRefreshHz) + " and " +
+                           std::to_string(kMaxDisplayRefreshHz) + " Hz, not " +
+                           std::to_string(config_.display_refresh_hz));
+    }
     for (const SystemOverride& entry : config_.overrides)
     {
         if (entry.handler == nullptr)
@@ -144,6 +155,11 @@ RuntimeFailure SystemSession::Impl::Initialize(xe::ui::Window* window)
     }
     logging_.emplace(config_.application_name,
                      config_.storage_root / "logs" / (config_.application_name + ".log"));
+
+    // Xenia's vblank thread paces at framerate_limit while vsync is on.
+    cvars::vsync = true;
+    cvars::framerate_limit = config_.display_refresh_hz;
+    cvars::perf_map = config_.write_perf_map;
 
     if (config_.audio == SystemAudio::Silent)
     {

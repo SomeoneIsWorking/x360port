@@ -87,6 +87,16 @@ int main(int, char** argv)
     config.overrides.push_back(SystemOverride{0x82000010U, nullptr, nullptr});
     RequireRefused(std::move(config), RuntimeError::OverrideInvalid, "override handler");
 
-    std::cout << "system_config_tests: 6 invalid configs refused before composing a console\n";
+    config = ValidConfig(existing);
+    config.display_refresh_hz = 0;
+    RequireRefused(std::move(config), RuntimeError::BackendInitializationFailed,
+                   "zero display refresh");
+
+    config = ValidConfig(existing);
+    config.display_refresh_hz = kMaxDisplayRefreshHz + 1;
+    RequireRefused(std::move(config), RuntimeError::BackendInitializationFailed,
+                   "display refresh above the maximum");
+
+    std::cout << "system_config_tests: 8 invalid configs refused before composing a console\n";
     return EXIT_SUCCESS;
 }
