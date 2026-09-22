@@ -332,9 +332,9 @@ when silent), and a title-supplied `hid::InputDriver` over `XamPadReader`/
 `XamCapabilitiesReader`. Overrides install in Xenia's `on_launch` callback, after the
 module maps and before its main thread resumes, bounded to the module's `.text` range;
 an identity mismatch or a refused override holds the main thread so the title never runs.
-`x360port_system_config_tests` requires each of six invalid configurations (zero title
+`x360port_system_config_tests` requires each of eight invalid configurations (zero title
 ID, missing title path, relative storage root, either null controller reader, a null
-override handler) to refuse with its typed error before any Xenia owner is composed.
+override handler, a display refresh of zero or above 1000 Hz) to refuse with its typed error before any Xenia owner is composed.
 `RunWindowedSystem` hosts the session in a GTK window with fullscreen toggles.
 `SystemSession::ExecutionCounts` reports the guest functions Xenia's processor has
 translated, failed to translate, and the host code they emitted, counted at
@@ -349,6 +349,10 @@ deflecting it further, and advances the packet number only on a change
 window's keyboard and mouse into it for the title to map (`x360port_desktop_input` covers
 the state's travel and capture contract); the GTK capture itself is exercised only by a
 person at the window.
+
+`display_refresh_hz` sets the console's vblank rate (60 Hz by default), which paces a title
+that presents on every Nth vblank; `write_perf_map` has the pinned fork write
+`/tmp/perf-<pid>.map` so Linux perf attributes code-cache samples to guest functions.
 
 Gaps: the windowed host exists only for Linux/GTK; the Windows and macOS hosts remain. Xenia
 cannot tear down a running title, so a launched session ends only through
