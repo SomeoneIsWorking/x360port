@@ -56,7 +56,7 @@ constexpr std::uint32_t kCodeSection = 0x00000020U;
 
 } // namespace
 
-PeImageLayoutResult MapPeImage(std::span<const std::byte> source)
+PeImageLayoutResult DescribeLoadedPeImage(std::span<const std::byte> source)
 {
     if (!HasBytes(source, 0, 0x40U) || std::to_integer<std::uint8_t>(source[0]) != 'M' ||
         std::to_integer<std::uint8_t>(source[1]) != 'Z')
@@ -102,55 +102,43 @@ PeImageLayoutResult MapPeImage(std::span<const std::byte> source)
     const std::size_t section_bytes = static_cast<std::size_t>(section_count) * 40U;
     if (!HasBytes(source, section_table, section_bytes))
     {
-        return Refuse("PE section table exceeds the normalized image");
+        return Refuse("PE section table exceeds the loaded image");
     }
 
     PeImageLayout layout;
-    layout.source_sha256 = HashBytes(source);
-    layout.image.assign(image_size, std::byte{0});
-    std::copy_n(source.begin(), header_size, layout.image.begin());
     layout.identity.base = image_base;
-    layout.identity.size = image_size;
+    layout.identity.size = static_cast<std::uint32_t>(source.size());
 
     std::uint64_t code_begin = std::numeric_limits<std::uint64_t>::max();
     std::uint64_t code_end = 0;
     for (std::size_t index = 0; index < section_count; ++index)
     {
         const std::size_t section = section_table + index * 40U;
-        const std::uint32_t virtual_size = ReadU32(source, section + 8U);
-        const std::uint32_t virtual_address = ReadU32(source, section + 12U);
         const std::uint32_t raw_size = ReadU32(source, section + 16U);
         const std::uint32_t raw_offset = ReadU32(source, section + 20U);
         const std::uint32_t characteristics = ReadU32(source, section + 36U);
-        const std::uint32_t mapped_size = std::max(virtual_size, raw_size);
-        const std::uint64_t mapped_end = static_cast<std::uint64_t>(virtual_address) + mapped_size;
-        if (mapped_end > image_size || (raw_size != 0U && !HasBytes(source, raw_offset, raw_size)))
+        if (!HasBytes(source, raw_offset, raw_size))
         {
-            return Refuse("PE section exceeds the normalized image or source bytes");
+            return Refuse("PE section exceeds the loaded image");
         }
 
         const bool code = (characteristics & kCodeSection) != 0U;
-        const std::uint64_t section_address =
-            static_cast<std::uint64_t>(image_base) + virtual_address;
-        if (section_address > std::numeric_limits<std::uint32_t>::max() || mapped_size == 0U)
+        const std::uint64_t section_address = static_cast<std::uint64_t>(image_base) + raw_offset;
+        if (section_address + raw_size >
+            std::numeric_limits<std::uint32_t>::max() + std::uint64_t{1})
         {
             return Refuse("PE section address overflows the guest address space");
         }
-        const GuestAddress section_base = static_cast<GuestAddress>(section_address);
-        layout.sections.push_back({SectionName(source, section), section_base, mapped_size, code});
-        if (raw_size != 0U)
-        {
-            std::copy_n(source.begin() + raw_offset, raw_size,
-                        layout.image.begin() + virtual_address);
-        }
-        if (code)
+        layout.sections.push_back({SectionName(source, section),
+                                   static_cast<GuestAddress>(section_address), raw_size, code});
+        if (code && raw_size != 0U)
         {
             code_begin = std::min(code_begin, section_address);
-            code_end = std::max(code_end, section_address + mapped_size);
+            code_end = std::max(code_end, section_address + raw_size);
         }
     }
 
-    const std::uint64_t image_end = static_cast<std::uint64_t>(image_base) + image_size;
+    const std::uint64_t image_end = static_cast<std::uint64_t>(image_base) + source.size();
     const std::uint64_t entry_point = static_cast<std::uint64_t>(image_base) + entry_rva;
     if (image_end > std::numeric_limits<std::uint32_t>::max() + std::uint64_t{1} ||
         code_begin == std::numeric_limits<std::uint64_t>::max() || code_end <= code_begin ||
@@ -162,7 +150,7 @@ PeImageLayoutResult MapPeImage(std::span<const std::byte> source)
     layout.identity.entry_point = static_cast<GuestAddress>(entry_point);
     layout.code = {static_cast<GuestAddress>(code_begin),
                    static_cast<std::uint32_t>(code_end - code_begin)};
-    layout.identity.sha256 = HashBytes(layout.image);
+    layout.identity.sha256 = HashBytes(source);
     return {.layout = std::move(layout), .error = {}};
 }
 

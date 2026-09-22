@@ -140,9 +140,9 @@ void WriteImage(const std::filesystem::path& path, std::span<const std::byte> im
            << "    \"savegame_id\": " << JsonString(Hex32(execution.savegame_id)) << "\n"
            << "  },\n"
            << "  \"image\": {\"sha256\": "
-           << JsonString(Sha256Hex(x360port::HashBytes(inspection.normalized_image)))
+           << JsonString(Sha256Hex(x360port::HashBytes(inspection.loaded_image)))
            << ", \"base\": " << JsonString(Hex32(layout.identity.base))
-           << ", \"size\": " << inspection.normalized_image.size()
+           << ", \"size\": " << inspection.loaded_image.size()
            << ", \"entry\": " << JsonString(Hex32(layout.identity.entry_point)) << "},\n"
            << "  \"sections\": [\n";
     for (std::size_t index = 0; index < layout.sections.size(); ++index)
@@ -192,17 +192,12 @@ void WriteImage(const std::filesystem::path& path, std::span<const std::byte> im
 
 [[nodiscard]] int Run(int argc, char** argv)
 {
-    const std::string_view image_option =
-        argc == 4 ? std::string_view(argv[2]) : std::string_view();
-    const bool wants_normalized_image = image_option == "--image-out";
-    const bool wants_mapped_image = image_option == "--mapped-image-out";
-    if (argc < 2 || argc > 4 || (argc == 4 && !wants_normalized_image && !wants_mapped_image))
+    const bool wants_image = argc == 4 && std::string_view(argv[2]) == "--image-out";
+    if (argc != 2 && !wants_image)
     {
-        std::cerr << "usage: x360-xex-inspect <default.xex> "
-                     "[--image-out path | --mapped-image-out path]\n"
-                     "  --image-out         the normalized XEX image, laid out by section raw "
-                     "offset\n"
-                     "  --mapped-image-out  the loaded image, indexed by guest virtual address\n";
+        std::cerr << "usage: x360-xex-inspect <default.xex> [--image-out path]\n"
+                     "  --image-out  the loaded image: the decompressed basefile as the loader\n"
+                     "               leaves it at the image base, indexed by guest address\n";
         return 2;
     }
     const std::filesystem::path xex_path = argv[1];
@@ -213,20 +208,9 @@ void WriteImage(const std::filesystem::path& path, std::span<const std::byte> im
         std::cerr << "x360-xex-inspect: refusing: " << result.error << '\n';
         return 1;
     }
-    if (wants_normalized_image)
+    if (wants_image)
     {
-        WriteImage(argv[3], result.inspection.normalized_image);
-    }
-    else if (wants_mapped_image)
-    {
-        const x360port::PeImageLayoutResult mapped =
-            x360port::MapPeImage(result.inspection.normalized_image);
-        if (!mapped)
-        {
-            std::cerr << "x360-xex-inspect: refusing: " << mapped.error << '\n';
-            return 1;
-        }
-        WriteImage(argv[3], mapped.layout.image);
+        WriteImage(argv[3], result.inspection.loaded_image);
     }
     std::cout << Document(xex, result.inspection);
     return 0;

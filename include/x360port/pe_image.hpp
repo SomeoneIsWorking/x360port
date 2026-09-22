@@ -20,13 +20,9 @@ struct PeSection
     bool code = false;
 };
 
+// Where an Xbox 360 image's sections sit once loaded, and what executes.
 struct PeImageLayout
 {
-    // The source digest identifies the normalized PE container emitted by the
-    // checked XEX loader. The module identity digest is for the flat guest
-    // image below, which is what RuntimeContext maps and executes.
-    Sha256Digest source_sha256{};
-    std::vector<std::byte> image;
     ImageIdentity identity;
     CodeRange code;
     std::vector<PeSection> sections;
@@ -40,11 +36,14 @@ struct PeImageLayoutResult
     [[nodiscard]] explicit operator bool() const noexcept { return error.empty(); }
 };
 
-// Maps an Xbox 360 PE image container into the flat guest address space
-// expected by GuestModule::ImageBytes(). It does not authenticate or decrypt
-// the XEX container; those title/provisioning owners must authenticate the
-// source bytes before calling this function.
-[[nodiscard]] PeImageLayoutResult MapPeImage(std::span<const std::byte> source);
+// Describes an Xbox 360 image as the XEX loader leaves it at its base
+// address: the decompressed basefile, copied flat. The loader does not move
+// sections to their PE VirtualAddress; each section's bytes stay at its
+// PointerToRawData, which a retail image can place well below the section's
+// VirtualAddress. The identity
+// digest covers `image` itself. This neither authenticates nor decrypts the
+// XEX container; the title/provisioning owners authenticate the bytes first.
+[[nodiscard]] PeImageLayoutResult DescribeLoadedPeImage(std::span<const std::byte> image);
 
 } // namespace x360port
 
