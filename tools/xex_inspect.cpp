@@ -1,4 +1,5 @@
 #include "x360port/xex_inspect.hpp"
+#include "x360port/pe_image.hpp"
 
 #include <array>
 #include <cstddef>
@@ -192,9 +193,17 @@ void WriteImage(const std::filesystem::path& path, std::span<const std::byte> im
 
 int main(int argc, char** argv)
 {
-    if (argc < 2 || argc > 4 || (argc == 4 && std::string_view(argv[2]) != "--image-out"))
+    const std::string_view image_option =
+        argc == 4 ? std::string_view(argv[2]) : std::string_view();
+    const bool wants_normalized_image = image_option == "--image-out";
+    const bool wants_mapped_image = image_option == "--mapped-image-out";
+    if (argc < 2 || argc > 4 || (argc == 4 && !wants_normalized_image && !wants_mapped_image))
     {
-        std::cerr << "usage: x360-xex-inspect <default.xex> [--image-out path]\n";
+        std::cerr << "usage: x360-xex-inspect <default.xex> "
+                     "[--image-out path | --mapped-image-out path]\n"
+                     "  --image-out         the normalized XEX image, laid out by section raw "
+                     "offset\n"
+                     "  --mapped-image-out  the loaded image, indexed by guest virtual address\n";
         return 2;
     }
     try
@@ -207,9 +216,20 @@ int main(int argc, char** argv)
             std::cerr << "x360-xex-inspect: refusing: " << result.error << '\n';
             return 1;
         }
-        if (argc == 4)
+        if (wants_normalized_image)
         {
             WriteImage(argv[3], result.inspection.normalized_image);
+        }
+        else if (wants_mapped_image)
+        {
+            const x360port::PeImageLayoutResult mapped =
+                x360port::MapPeImage(result.inspection.normalized_image);
+            if (!mapped)
+            {
+                std::cerr << "x360-xex-inspect: refusing: " << mapped.error << '\n';
+                return 1;
+            }
+            WriteImage(argv[3], mapped.layout.image);
         }
         std::cout << Document(xex, result.inspection);
         return 0;
