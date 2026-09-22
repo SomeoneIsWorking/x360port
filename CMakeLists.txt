@@ -48,6 +48,7 @@ endif()
 
 set(X360PORT_RUNTIME_SOURCES
     src/device_dispatch.cpp
+    src/export_names.cpp
     src/executable_invalidation.cpp
     src/guest_execution.cpp
     src/guest_fault_guard.cpp
@@ -64,6 +65,7 @@ set(X360PORT_RUNTIME_SOURCES
     src/xex_inspect.cpp
 )
 set(X360PORT_RUNTIME_HEADERS
+    include/x360port/export_names.hpp
     include/x360port/runtime.hpp
     include/x360port/xam_input.hpp
     src/device_dispatch.hpp
@@ -190,6 +192,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         x360port_enable_warnings(x360port_import_runtime_tests)
         add_test(NAME import_runtime COMMAND x360port_import_runtime_tests)
 
+        add_executable(x360port_export_name_tests tests/export_name_tests.cpp)
+        target_link_libraries(x360port_export_name_tests PRIVATE x360port)
+        x360port_enable_warnings(x360port_export_name_tests)
+        add_test(NAME export_names COMMAND x360port_export_name_tests)
+
         add_executable(x360port_xex_inspect_tests tests/xex_inspect_tests.cpp)
         target_link_libraries(x360port_xex_inspect_tests PRIVATE x360port)
         x360port_enable_warnings(x360port_xex_inspect_tests)
@@ -204,6 +211,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 ${X360PORT_RUNTIME_SOURCES}
                 ${X360PORT_RUNTIME_HEADERS}
                 tests/contract_tests.cpp
+                tests/export_name_tests.cpp
                 tests/import_runtime_tests.cpp
                 tests/runtime_tests.cpp
                 tests/xex_inspect_tests.cpp
@@ -224,6 +232,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
                     --warnings-as-errors=*
                     ${X360PORT_RUNTIME_SOURCES}
+                    tests/export_name_tests.cpp
                     tests/import_runtime_tests.cpp
                     tests/runtime_tests.cpp
                     tests/xex_inspect_tests.cpp

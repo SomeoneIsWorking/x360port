@@ -24,6 +24,7 @@ static or interpreter product path.
 | S014 | Asset-free native-host runtime CI executes the synthetic JIT contract | partial | S003, S004, S008, S013 | G001 |
 | S015 | Checked XEX2 inspection and canonical normalized-image output | verified | S001, S002, S003, S004 | G001, G002 |
 | S016 | XAM controller state/capabilities imports use title-supplied device data | verified | S008, S011 | G001 |
+| S017 | Kernel/XAM ordinals resolve to exported names for binding | verified | S002 | G001, G002 |
 
 ## Current focus
 
@@ -278,3 +279,13 @@ The same production-boundary test calls ordinal 400 and verifies the 20-byte
 type/subtype/flags, supported gamepad, and vibration record, disconnected zeroing,
 null-pointer bad-arguments result, and typed refusal of invalid guest memory.
 The consumer owns controller-source arbitration, capability policy, and user slots.
+
+### S017 — export-name resolution
+
+Evidence: `tests/export_name_tests.cpp` resolves 922 `xboxkrnl.exe` and 1736 `xam.xex`
+exports from the vendored Xenia ordinal tables in both directions, checks the kind of a
+known function and a known variable export, and requires an unknown library name, an
+unexported ordinal, a misspelled export name, and a kernel export requested through the
+XAM library each to refuse. The populated counts are asserted before the negatives so an
+empty table cannot pass. Ordinal `0xCC`/`NtAllocateVirtualMemory` and ordinal 971/
+`XGetAVPack` are checked against bindings recorded outside this table.
