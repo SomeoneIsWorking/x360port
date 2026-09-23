@@ -358,6 +358,8 @@ person at the window.
 `display_refresh_hz` sets the console's vblank rate (60 Hz by default), which paces a title
 that presents on every Nth vblank; `write_perf_map` has the pinned fork write
 `/tmp/perf-<pid>.map` so Linux perf attributes code-cache samples to guest functions.
+`FrameIntervals()` snapshots the host time between guest presents in 0.1 ms buckets, from
+which a caller reports percentiles over any window (`x360port_frame_intervals`).
 
 Gaps: the windowed host exists only for Linux/GTK; the Windows and macOS hosts remain. Xenia
 cannot tear down a running title, so a launched session ends only through

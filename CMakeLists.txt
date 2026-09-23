@@ -97,6 +97,7 @@ set(X360PORT_RUNTIME_HEADERS
 )
 set(X360PORT_SYSTEM_SOURCES
     src/system/desktop_capture_gtk.cpp
+    src/system/frame_intervals.cpp
     src/system/pad_merge.cpp
     src/system/system_call_context.cpp
     src/system/system_input_driver.cpp
@@ -104,6 +105,7 @@ set(X360PORT_SYSTEM_SOURCES
     src/system/system_window_gtk.cpp
 )
 set(X360PORT_SYSTEM_HEADERS
+    include/x360port/frame_intervals.hpp
     include/x360port/system_session.hpp
     src/system/desktop_capture_gtk.hpp
     src/system/pad_merge.hpp
@@ -277,6 +279,11 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             x360port_enable_warnings(x360port_system_config_tests)
             add_test(NAME system_config COMMAND x360port_system_config_tests)
 
+            add_executable(x360port_frame_interval_tests tests/frame_interval_tests.cpp)
+            target_link_libraries(x360port_frame_interval_tests PRIVATE x360port_system)
+            x360port_enable_warnings(x360port_frame_interval_tests)
+            add_test(NAME frame_intervals COMMAND x360port_frame_interval_tests)
+
             add_executable(x360port_pad_merge_tests tests/pad_merge_tests.cpp)
             target_include_directories(x360port_pad_merge_tests PRIVATE src/system)
             target_link_libraries(x360port_pad_merge_tests PRIVATE x360port_system)
@@ -297,6 +304,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 tests/contract_tests.cpp
                 tests/desktop_input_tests.cpp
                 tests/export_name_tests.cpp
+                tests/frame_interval_tests.cpp
                 tests/import_runtime_tests.cpp
                 tests/kernel_memory_tests.cpp
                 tests/pad_merge_tests.cpp
@@ -334,6 +342,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
                         --warnings-as-errors=*
                         ${X360PORT_SYSTEM_SOURCES}
+                        tests/frame_interval_tests.cpp
                         tests/pad_merge_tests.cpp
                         tests/system_config_tests.cpp
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

@@ -59,6 +59,7 @@ class SystemSession::Impl final
     [[nodiscard]] RuntimeFailure Launch();
 
     [[nodiscard]] std::uint64_t PresentedFrameCount() const noexcept;
+    [[nodiscard]] FrameIntervalHistogram FrameIntervals() const noexcept;
     [[nodiscard]] RuntimeFailure CaptureGuestOutput(SystemFrameImage& image) const;
     [[nodiscard]] SystemExecutionCounts ExecutionCounts() const noexcept;
 
