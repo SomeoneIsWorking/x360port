@@ -27,6 +27,8 @@
 #include "xenia/hid/sdl/sdl_hid.h"
 #include "xenia/kernel/kernel_state.h"
 #include "xenia/kernel/user_module.h"
+#include "xenia/kernel/xam/profile_manager.h"
+#include "xenia/kernel/xam/xam_state.h"
 #include "xenia/kernel/xthread.h"
 #include "xenia/ui/presenter.h"
 
@@ -108,6 +110,14 @@ RuntimeFailure SystemSession::Impl::ValidateConfig() const
     {
         return Failure(RuntimeError::ModuleValidationFailed,
                        "the storage root must be an absolute per-user directory");
+    }
+    if (!config_.player_gamertag.empty() &&
+        !xe::kernel::xam::ProfileManager::IsGamertagValid(config_.player_gamertag))
+    {
+        return Failure(RuntimeError::ModuleValidationFailed,
+                       "the console refuses the gamertag \"" + config_.player_gamertag +
+                           "\": 1-15 letters, digits and single inner spaces, starting "
+                           "with a letter");
     }
     if (config_.input.state == nullptr || config_.input.capabilities == nullptr)
     {
@@ -196,9 +206,38 @@ RuntimeFailure SystemSession::Impl::Initialize(xe::ui::Window* window)
     {
         return input_failure_;
     }
+    if (RuntimeFailure failure = SignInLocalPlayer())
+    {
+        return failure;
+    }
     call_context_.emplace(*emulator_->memory(), *emulator_->processor());
     overrides_.Bind(*emulator_->processor(), *call_context_, statistics_,
                     EndTitleAfterOverrideFailure);
+    return {};
+}
+
+RuntimeFailure SystemSession::Impl::SignInLocalPlayer()
+{
+    if (config_.player_gamertag.empty())
+    {
+        return {};
+    }
+    xe::kernel::xam::ProfileManager& profiles =
+        *emulator_->kernel_state()->xam_state()->profile_manager();
+    // Accounts are ordered by XUID, so the same profile is chosen every time.
+    if (profiles.GetAccounts()->empty() &&
+        !profiles.CreateProfile(config_.player_gamertag, /*autologin=*/false))
+    {
+        return Failure(RuntimeError::BackendInitializationFailed,
+                       "the local player's profile could not be created under the storage root");
+    }
+    const std::uint64_t xuid = profiles.GetAccounts()->begin()->first;
+    profiles.Login(xuid, 0, /*notify=*/false);
+    if (profiles.GetProfile(std::uint8_t{0}) == nullptr)
+    {
+        return Failure(RuntimeError::BackendInitializationFailed,
+                       "the local player's profile under the storage root could not be signed in");
+    }
     return {};
 }
 

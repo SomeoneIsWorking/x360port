@@ -70,6 +70,12 @@ struct SystemSessionConfig
     // The title ID the loaded module must report before its first instruction
     // runs. Zero is refused: a session always states which title it expects.
     std::uint32_t expected_title_id = 0;
+    // The gamertag of the local player signed in to controller slot 0 before
+    // the title starts, so it can save; the console refuses saves to a title
+    // with nobody signed in. The first session under a storage root creates
+    // the profile; later ones sign in the profile already there, whatever its
+    // name. Empty signs nobody in. A name the console would refuse is refused.
+    std::string player_gamertag;
     SystemAudio audio = SystemAudio::Device;
     // Asked first; while it reports no pad, the host input below answers.
     SystemInputSource input;

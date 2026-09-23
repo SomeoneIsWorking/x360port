@@ -72,6 +72,7 @@ class SystemSession::Impl final
     static constexpr std::size_t kHostInputZOrder = 1;
 
     [[nodiscard]] RuntimeFailure ValidateConfig() const;
+    [[nodiscard]] RuntimeFailure SignInLocalPlayer();
     [[nodiscard]] std::vector<std::unique_ptr<xe::hid::InputDriver>>
     CreateInputDrivers(xe::ui::Window* window);
     // Runs on the launching thread after the module is loaded and before its
