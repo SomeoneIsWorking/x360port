@@ -123,6 +123,13 @@ RuntimeFailure SystemSession::Impl::ValidateConfig() const
                            std::to_string(kMaxDisplayRefreshHz) + " Hz, not " +
                            std::to_string(config_.display_refresh_hz));
     }
+    if (config_.max_presents_per_second > config_.display_refresh_hz)
+    {
+        return Failure(RuntimeError::BackendInitializationFailed,
+                       "the present limit must not exceed the display refresh of " +
+                           std::to_string(config_.display_refresh_hz) + " Hz, not " +
+                           std::to_string(config_.max_presents_per_second));
+    }
     for (const SystemOverride& entry : config_.overrides)
     {
         if (entry.handler == nullptr)
@@ -159,6 +166,7 @@ RuntimeFailure SystemSession::Impl::Initialize(xe::ui::Window* window)
     // Xenia's vblank thread paces at framerate_limit while vsync is on.
     cvars::vsync = true;
     cvars::framerate_limit = config_.display_refresh_hz;
+    cvars::guest_present_limit = config_.max_presents_per_second;
     cvars::perf_map = config_.write_perf_map;
 
     if (config_.audio == SystemAudio::Silent)
