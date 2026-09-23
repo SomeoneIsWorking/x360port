@@ -356,7 +356,9 @@ the state's travel and capture contract); the GTK capture itself is exercised on
 person at the window.
 
 `display_refresh_hz` sets the console's vblank rate (60 Hz by default), which paces a title
-that presents on every Nth vblank; `write_perf_map` has the pinned fork write
+that presents on every Nth vblank; `max_presents_per_second` caps presents on the host
+instead, holding a present only when it arrives early, so a title can run its vblank fast
+without vblank pacing rounding a slow frame up to the next vblank; `write_perf_map` has the pinned fork write
 `/tmp/perf-<pid>.map` so Linux perf attributes code-cache samples to guest functions.
 `FrameIntervals()` snapshots the host time between guest presents in 0.1 ms buckets, from
 which a caller reports percentiles over any window (`x360port_frame_intervals`).

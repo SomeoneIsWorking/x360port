@@ -85,6 +85,12 @@ struct SystemSessionConfig
     // whether its game clock follows the vblank or the host clock is the
     // title's property, for its adapter to establish before raising this.
     std::uint32_t display_refresh_hz = kConsoleDisplayRefreshHz;
+    // A host ceiling on guest presents per second, at most
+    // display_refresh_hz; zero leaves the vblank rate as the only limit. A
+    // present that arrives within 1 / max_presents_per_second of the previous
+    // one waits, and a later one is never delayed, so a title may run its
+    // vblank fast enough that vblank pacing never rounds a slow frame up.
+    std::uint32_t max_presents_per_second = 0;
     // Appends each translated guest function to /tmp/perf-<pid>.map, the
     // symbol file Linux perf reads for JIT code. Diagnostic; Linux only.
     bool write_perf_map = false;

@@ -96,7 +96,12 @@ void RequireRefused(SystemSessionConfig config, RuntimeError expected, std::stri
     RequireRefused(std::move(config), RuntimeError::BackendInitializationFailed,
                    "display refresh above the maximum");
 
-    std::cout << "system_config_tests: 8 invalid configs refused before composing a console\n";
+    config = ValidConfig(existing);
+    config.max_presents_per_second = config.display_refresh_hz + 1;
+    RequireRefused(std::move(config), RuntimeError::BackendInitializationFailed,
+                   "present limit above the display refresh");
+
+    std::cout << "system_config_tests: 9 invalid configs refused before composing a console\n";
     return EXIT_SUCCESS;
 }
 
