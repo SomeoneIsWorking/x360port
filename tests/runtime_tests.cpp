@@ -407,6 +407,27 @@ void Require(bool condition, std::string_view message)
         recreated.context->ReadMappedGuestMemory(kDeviceAddress, mapped_device);
     Require(mapped_device_read.error == RuntimeError::GuestMemoryRangeInvalid,
             "mapped guest-memory access accepted a device range");
+    // A range is refused when any byte of it is device-mapped, including only
+    // its last bytes, and accepted up to the byte before the device begins.
+    const GuestMemoryAllocationResult straddle = recreated.context->AllocateGuestMemory(0x4000U);
+    Require(static_cast<bool>(straddle), "could not allocate the device-straddle fixture");
+    const GuestAddress device_page =
+        ((straddle.allocation.address + 0xFFFU) & ~GuestAddress{0xFFFU}) + 0x1000U;
+    loaded = recreated.context->RegisterDeviceMemoryRange(
+        device_page, 0xFFFFF000, 0x1000, DeviceRead, DeviceWrite, &device_observations);
+    Require(!loaded, loaded.detail);
+    std::array<std::byte, 8> straddle_bytes{};
+    Require(!recreated.context->ReadMappedGuestMemory(device_page - 8U, straddle_bytes),
+            "mapped guest-memory access refused a range ending before a device page");
+    Require(recreated.context->ReadMappedGuestMemory(device_page - 4U, straddle_bytes).error ==
+                RuntimeError::GuestMemoryRangeInvalid,
+            "mapped guest-memory access accepted a range whose last bytes are device-mapped");
+    Require(recreated.context->ReadMappedGuestMemory(device_page + 0xFFCU, straddle_bytes).error ==
+                RuntimeError::GuestMemoryRangeInvalid,
+            "mapped guest-memory access accepted a range whose first bytes are device-mapped");
+    Require(!recreated.context->ReadMappedGuestMemory(device_page + 0x1000U, straddle_bytes),
+            "mapped guest-memory access refused a range starting after a device page");
+
     ExecutionResult device_read = recreated.context->Execute(kDeviceReadAddress);
     Require(static_cast<bool>(device_read), device_read.failure.detail);
     Require(device_read.value == 0x12345678U, "the device read returned the wrong value");

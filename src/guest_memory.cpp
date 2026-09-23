@@ -163,15 +163,8 @@ bool GuestMemory::CanAccess(GuestAddress address, std::size_t size, bool write) 
     {
         return false;
     }
-    for (std::size_t offset = 0; offset < size; ++offset)
-    {
-        if (memory_->LookupVirtualMappedRange(address + static_cast<GuestAddress>(offset)) !=
-            nullptr)
-        {
-            return false;
-        }
-    }
-    return true;
+    return memory_->LookupVirtualMappedRangeOverlapping(
+               address, static_cast<GuestAddress>(last_address)) == nullptr;
 }
 
 } // namespace x360port
