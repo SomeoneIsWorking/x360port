@@ -1,3 +1,4 @@
+#include "x360port/guest_endian.hpp"
 #include "x360port/module_contract.hpp"
 
 #include <array>
@@ -24,14 +25,6 @@ constexpr std::array<std::uint32_t, 64> RoundConstants = {
     0x748f82eeU, 0x78a5636fU, 0x84c87814U, 0x8cc70208U, 0x90befffaU, 0xa4506cebU, 0xbef9a3f7U,
     0xc67178f2U,
 };
-
-[[nodiscard]] std::uint32_t LoadBigEndian(const std::byte* bytes) noexcept
-{
-    return (std::to_integer<std::uint32_t>(bytes[0]) << 24U) |
-           (std::to_integer<std::uint32_t>(bytes[1]) << 16U) |
-           (std::to_integer<std::uint32_t>(bytes[2]) << 8U) |
-           std::to_integer<std::uint32_t>(bytes[3]);
-}
 
 // SHA-256 over a byte stream that holds one 64-byte block, so hashing never
 // allocates and cannot fail.
@@ -107,7 +100,7 @@ class Sha256Stream
         std::array<std::uint32_t, 64> words{};
         for (std::size_t index = 0; index < 16U; ++index)
         {
-            words[index] = LoadBigEndian(&block_[index * 4U]);
+            words[index] = LoadGuestWord(block_, index * 4U);
         }
         for (std::size_t index = 16; index < words.size(); ++index)
         {
