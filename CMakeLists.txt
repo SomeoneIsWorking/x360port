@@ -30,6 +30,7 @@ set(X360PORT_VALIDATION_SOURCES
     src/validation.cpp
 )
 set(X360PORT_VALIDATION_HEADERS
+    include/x360port/guest_endian.hpp
     include/x360port/module_contract.hpp
     include/x360port/pe_image.hpp
     include/x360port/validation.hpp

@@ -1,4 +1,5 @@
 #include "guarded_main.hpp"
+#include "x360port/guest_endian.hpp"
 #include "x360port/pe_image.hpp"
 #include "x360port/validation.hpp"
 
@@ -138,6 +139,20 @@ void TestSha256KnownAnswer()
     if (HashBytes(Input) != Expected)
     {
         std::fprintf(stderr, "FAIL SHA-256 known-answer test for abc\n");
+        ++failures;
+    }
+}
+
+void TestGuestWords()
+{
+    std::array<std::byte, 6> bytes{};
+    StoreGuestWord(bytes, 1U, 0x82BED138U);
+    ++checks;
+    if (bytes[1] != std::byte{0x82} || bytes[4] != std::byte{0x38} || bytes[0] != std::byte{} ||
+        bytes[5] != std::byte{} || LoadGuestWord(bytes, 1U) != 0x82BED138U ||
+        LoadGuestWord(bytes, 2U) != 0xBED13800U)
+    {
+        std::fprintf(stderr, "FAIL guest words are not stored and loaded most significant first\n");
         ++failures;
     }
 }
@@ -394,6 +409,7 @@ void TestErrorCoverage()
 [[nodiscard]] int RunTests()
 {
     TestSha256KnownAnswer();
+    TestGuestWords();
     TestLoadedPeImage();
     TestImportDigestCoverage();
     TestAcceptance();
@@ -405,7 +421,8 @@ void TestErrorCoverage()
         std::fprintf(stderr, "%d failure(s) across %d contract checks\n", failures, checks);
         return 1;
     }
-    std::printf("%d checks passed (SHA-256, image layout, typed imports, refusals)\n", checks);
+    std::printf("%d checks passed (SHA-256, guest words, image layout, typed imports, refusals)\n",
+                checks);
     return 0;
 }
 
