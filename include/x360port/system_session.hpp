@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -164,6 +165,13 @@ class SystemSession final
     [[nodiscard]] RuntimeFailure CaptureGuestOutput(SystemFrameImage& image) const;
 
     [[nodiscard]] SystemExecutionCounts ExecutionCounts() const noexcept;
+
+    // Copies guest virtual memory while the title runs, for maintainer probes.
+    // Refuses a range that is not wholly mapped and readable in one heap. The
+    // guest may be writing the range meanwhile, so a multi-word value can be
+    // torn; a probe reads what it needs and treats it as a snapshot.
+    [[nodiscard]] RuntimeFailure ReadGuestMemory(GuestAddress address,
+                                                 std::span<std::byte> bytes) const;
 
     // Ends the process. Xenia cannot tear down a title whose guest threads are
     // running, so once Launch has succeeded this is the only way a session

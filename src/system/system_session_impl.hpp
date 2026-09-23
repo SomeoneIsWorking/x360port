@@ -62,6 +62,8 @@ class SystemSession::Impl final
     [[nodiscard]] FrameIntervalHistogram FrameIntervals() const noexcept;
     [[nodiscard]] RuntimeFailure CaptureGuestOutput(SystemFrameImage& image) const;
     [[nodiscard]] SystemExecutionCounts ExecutionCounts() const noexcept;
+    [[nodiscard]] RuntimeFailure ReadGuestMemory(GuestAddress address,
+                                                 std::span<std::byte> bytes) const;
 
     [[nodiscard]] xe::Emulator& Emulator() const noexcept { return *emulator_; }
     [[nodiscard]] const SystemSessionConfig& Config() const noexcept { return config_; }

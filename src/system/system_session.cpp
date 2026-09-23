@@ -398,6 +398,17 @@ SystemExecutionCounts SystemSession::Impl::ExecutionCounts() const noexcept
     };
 }
 
+RuntimeFailure SystemSession::Impl::ReadGuestMemory(GuestAddress address,
+                                                    std::span<std::byte> bytes) const
+{
+    if (!call_context_)
+    {
+        return Failure(RuntimeError::LoadStateInvalid,
+                       "the session has no guest memory before it is initialized");
+    }
+    return call_context_->ReadMappedGuestMemory(address, bytes);
+}
+
 void SystemSession::EndProcess(int status) noexcept
 {
     xe::FlushLog();
@@ -433,6 +444,12 @@ FrameIntervalHistogram SystemSession::FrameIntervals() const noexcept
 RuntimeFailure SystemSession::CaptureGuestOutput(SystemFrameImage& image) const
 {
     return impl_->CaptureGuestOutput(image);
+}
+
+RuntimeFailure SystemSession::ReadGuestMemory(GuestAddress address,
+                                              std::span<std::byte> bytes) const
+{
+    return impl_->ReadGuestMemory(address, bytes);
 }
 
 SystemExecutionCounts SystemSession::ExecutionCounts() const noexcept
