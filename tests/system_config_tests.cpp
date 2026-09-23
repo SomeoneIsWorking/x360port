@@ -43,6 +43,7 @@ SystemSessionConfig ValidConfig(const std::filesystem::path& existing_path)
     config.storage_root = std::filesystem::temp_directory_path() / "x360port-system-config-tests";
     config.expected_title_id = 0x4D5307D5U;
     config.audio = SystemAudio::Silent;
+    config.player_gamertag = "Player";
     config.input = SystemInputSource{NoPad, NoCapabilities, nullptr};
     config.overrides.push_back(SystemOverride{0x82000000U, Passthrough, nullptr});
     return config;
@@ -101,7 +102,17 @@ void RequireRefused(SystemSessionConfig config, RuntimeError expected, std::stri
     RequireRefused(std::move(config), RuntimeError::BackendInitializationFailed,
                    "present limit above the display refresh");
 
-    std::cout << "system_config_tests: 9 invalid configs refused before composing a console\n";
+    config = ValidConfig(existing);
+    config.player_gamertag = "1Player";
+    RequireRefused(std::move(config), RuntimeError::ModuleValidationFailed,
+                   "gamertag starting with a digit");
+
+    config = ValidConfig(existing);
+    config.player_gamertag = "SixteenLettersXY";
+    RequireRefused(std::move(config), RuntimeError::ModuleValidationFailed,
+                   "gamertag longer than the console allows");
+
+    std::cout << "system_config_tests: 11 invalid configs refused before composing a console\n";
     return EXIT_SUCCESS;
 }
 
