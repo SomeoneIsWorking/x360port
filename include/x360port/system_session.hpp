@@ -2,6 +2,7 @@
 #define X360PORT_SYSTEM_SESSION_HPP
 
 #include "x360port/desktop_input.hpp"
+#include "x360port/frame_intervals.hpp"
 #include "x360port/guest_call.hpp"
 #include "x360port/runtime_failure.hpp"
 #include "x360port/xam_input.hpp"
@@ -141,6 +142,10 @@ class SystemSession final
 
     // Guest presents observed since launch. Monotonic.
     [[nodiscard]] std::uint64_t PresentedFrameCount() const noexcept;
+
+    // Host time between consecutive guest presents since launch. Monotonic:
+    // subtract an earlier snapshot to report a window.
+    [[nodiscard]] FrameIntervalHistogram FrameIntervals() const noexcept;
 
     // The most recent guest output image. Fails, rather than returning an
     // empty image, before the title has presented.

@@ -304,6 +304,19 @@ std::uint64_t SystemSession::Impl::PresentedFrameCount() const noexcept
     return commands ? commands->guest_swap_count() : 0;
 }
 
+FrameIntervalHistogram SystemSession::Impl::FrameIntervals() const noexcept
+{
+    static_assert(xe::gpu::CommandProcessor::kSwapIntervalBucketMicroseconds ==
+                          FrameIntervalHistogram::kBucketMicroseconds &&
+                      xe::gpu::CommandProcessor::kSwapIntervalBucketCount ==
+                          FrameIntervalHistogram::kBucketCount,
+                  "the frame-interval buckets must match the command processor's");
+    xe::gpu::GraphicsSystem* graphics = emulator_ ? emulator_->graphics_system() : nullptr;
+    xe::gpu::CommandProcessor* commands = graphics ? graphics->command_processor() : nullptr;
+    return commands ? FrameIntervalHistogram(commands->swap_interval_buckets())
+                    : FrameIntervalHistogram();
+}
+
 RuntimeFailure SystemSession::Impl::CaptureGuestOutput(SystemFrameImage& image) const
 {
     xe::gpu::GraphicsSystem* graphics = emulator_ ? emulator_->graphics_system() : nullptr;
@@ -363,6 +376,11 @@ RuntimeFailure SystemSession::Launch() { return impl_->Launch(); }
 std::uint64_t SystemSession::PresentedFrameCount() const noexcept
 {
     return impl_->PresentedFrameCount();
+}
+
+FrameIntervalHistogram SystemSession::FrameIntervals() const noexcept
+{
+    return impl_->FrameIntervals();
 }
 
 RuntimeFailure SystemSession::CaptureGuestOutput(SystemFrameImage& image) const
