@@ -29,15 +29,22 @@ constexpr GuestAddress kUnimplementedOpcodeAddress = kCodeAddress + 184;
 constexpr GuestAddress kControlFlowAddress = kCodeAddress + 192;
 constexpr GuestAddress kMemoryFallbackAddress = kCodeAddress + 216;
 constexpr GuestAddress kFaultingReadAddress = kCodeAddress + 232;
-constexpr std::uint32_t kDeviceAddress = 0xC0001000;
+// A device range any supported host can protect on its own: 64 KB, the largest
+// host page of an ARM64 host.
+constexpr std::uint32_t kDeviceAddress = 0xC0010000;
+constexpr std::uint32_t kDeviceBytes = 0x10000;
+// lis r3, kDeviceAddress@h; ori r3, r3, kDeviceAddress@l
+constexpr std::uint32_t kLoadDeviceHigh = 0x3C600000U | (kDeviceAddress >> 16U);
+constexpr std::uint32_t kLoadDeviceLow = 0x60630000U | (kDeviceAddress & 0xFFFFU);
 class TestModule final : public GuestModule
 {
   public:
     TestModule()
     {
         CopyWords(0, {0x3860002A, 0x4E800020}); // li r3, 42; blr
-        CopyWords(8, {0x3C60C000, 0x60631000, 0x80630000, 0x4E800020});
-        CopyWords(24, {0x3C60C000, 0x60631000, 0x38800063, 0x90830004, 0x38600007, 0x4E800020});
+        CopyWords(8, {kLoadDeviceHigh, kLoadDeviceLow, 0x80630000, 0x4E800020});
+        CopyWords(
+            24, {kLoadDeviceHigh, kLoadDeviceLow, 0x38800063, 0x90830004, 0x38600007, 0x4E800020});
         CopyWords(48, {0x3C608200, 0x60630000, 0x3C803860, 0x6084002B, 0x90830000, 0x38600009,
                        0x4E800020});
         CopyWords(80, {0x7C0802A6, 0x4800000D, 0x7C0803A6, 0x4E800020, 0x38600011, 0x4E800020});

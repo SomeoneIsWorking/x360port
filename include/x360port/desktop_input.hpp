@@ -107,7 +107,8 @@ struct DesktopSnapshot
 
     [[nodiscard]] bool IsKeyDown(DesktopKey key) const noexcept
     {
-        return keys.test(static_cast<std::size_t>(key));
+        const auto index = static_cast<std::size_t>(key);
+        return index < keys.size() && keys[index];
     }
     [[nodiscard]] bool IsButtonDown(DesktopMouseButton button) const noexcept
     {

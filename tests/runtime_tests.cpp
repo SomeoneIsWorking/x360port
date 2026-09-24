@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <iostream>
-#include <new>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -63,16 +62,7 @@ ExecutionResult AddOneThroughOriginal(GuestCallContext& call, GuestAddress addre
 ExecutionResult RefuseOverride(GuestCallContext&, GuestAddress, std::span<const std::uint64_t>,
                                void*) noexcept
 {
-    try
-    {
-        return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};
-    }
-    catch (const std::bad_alloc&)
-    {
-        // The refusal stands without its detail; the test then reports the
-        // missing detail instead of the override terminating the process.
-        return {{RuntimeError::ExecutionFailed, {}}, 0};
-    }
+    return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};
 }
 
 [[noreturn]] void Fail(std::string_view message)
@@ -395,12 +385,14 @@ void Require(bool condition, std::string_view message)
             "removing an override unnecessarily retranslated the original");
 
     DeviceObservations device_observations;
-    loaded = recreated.context->RegisterDeviceMemoryRange(
-        kDeviceAddress, 0xFFFFF000, 0x1000, nullptr, DeviceWrite, &device_observations);
+    loaded = recreated.context->RegisterDeviceMemoryRange(kDeviceAddress, ~(kDeviceBytes - 1U),
+                                                          kDeviceBytes, nullptr, DeviceWrite,
+                                                          &device_observations);
     Require(loaded.error == RuntimeError::DeviceRangeInvalid,
             "a null device read callback was accepted");
-    loaded = recreated.context->RegisterDeviceMemoryRange(
-        kDeviceAddress, 0xFFFFF000, 0x1000, DeviceRead, DeviceWrite, &device_observations);
+    loaded = recreated.context->RegisterDeviceMemoryRange(kDeviceAddress, ~(kDeviceBytes - 1U),
+                                                          kDeviceBytes, DeviceRead, DeviceWrite,
+                                                          &device_observations);
     Require(!loaded, loaded.detail);
     std::array<std::byte, 4> mapped_device{};
     const RuntimeFailure mapped_device_read =
@@ -409,12 +401,19 @@ void Require(bool condition, std::string_view message)
             "mapped guest-memory access accepted a device range");
     // A range is refused when any byte of it is device-mapped, including only
     // its last bytes, and accepted up to the byte before the device begins.
-    const GuestMemoryAllocationResult straddle = recreated.context->AllocateGuestMemory(0x4000U);
+    const GuestMemoryAllocationResult straddle =
+        recreated.context->AllocateGuestMemory(4U * kDeviceBytes);
     Require(static_cast<bool>(straddle), "could not allocate the device-straddle fixture");
     const GuestAddress device_page =
-        ((straddle.allocation.address + 0xFFFU) & ~GuestAddress{0xFFFU}) + 0x1000U;
+        ((straddle.allocation.address + kDeviceBytes - 1U) & ~(kDeviceBytes - 1U)) + kDeviceBytes;
     loaded = recreated.context->RegisterDeviceMemoryRange(
-        device_page, 0xFFFFF000, 0x1000, DeviceRead, DeviceWrite, &device_observations);
+        device_page + 0x800U, ~(kDeviceBytes - 1U), kDeviceBytes, DeviceRead, DeviceWrite,
+        &device_observations);
+    Require(loaded.error == RuntimeError::DeviceRangeInvalid,
+            "a device range that does not start on a host page was accepted");
+    loaded = recreated.context->RegisterDeviceMemoryRange(device_page, ~(kDeviceBytes - 1U),
+                                                          kDeviceBytes, DeviceRead, DeviceWrite,
+                                                          &device_observations);
     Require(!loaded, loaded.detail);
     std::array<std::byte, 8> straddle_bytes{};
     Require(!recreated.context->ReadMappedGuestMemory(device_page - 8U, straddle_bytes),
@@ -422,10 +421,11 @@ void Require(bool condition, std::string_view message)
     Require(recreated.context->ReadMappedGuestMemory(device_page - 4U, straddle_bytes).error ==
                 RuntimeError::GuestMemoryRangeInvalid,
             "mapped guest-memory access accepted a range whose last bytes are device-mapped");
-    Require(recreated.context->ReadMappedGuestMemory(device_page + 0xFFCU, straddle_bytes).error ==
-                RuntimeError::GuestMemoryRangeInvalid,
-            "mapped guest-memory access accepted a range whose first bytes are device-mapped");
-    Require(!recreated.context->ReadMappedGuestMemory(device_page + 0x1000U, straddle_bytes),
+    Require(
+        recreated.context->ReadMappedGuestMemory(device_page + kDeviceBytes - 4U, straddle_bytes)
+                .error == RuntimeError::GuestMemoryRangeInvalid,
+        "mapped guest-memory access accepted a range whose first bytes are device-mapped");
+    Require(!recreated.context->ReadMappedGuestMemory(device_page + kDeviceBytes, straddle_bytes),
             "mapped guest-memory access refused a range starting after a device page");
 
     ExecutionResult device_read = recreated.context->Execute(kDeviceReadAddress);
