@@ -1,5 +1,6 @@
 #include "device_dispatch.hpp"
 
+#include "xenia/base/memory.h"
 #include "xenia/memory.h"
 
 namespace x360port
@@ -24,6 +25,15 @@ RuntimeFailure DeviceDispatch::Register(xe::Memory& memory, std::uint32_t addres
     {
         return Failure(RuntimeError::DeviceRangeInvalid,
                        "device range requires a non-empty aligned masked range and both callbacks");
+    }
+    // Accesses reach the callbacks through a host page protected against
+    // them, so the range must be whole host pages or its neighbours would
+    // fault too, or it could not be protected at all.
+    const auto host_page = static_cast<std::uint32_t>(xe::memory::page_size());
+    if (address % host_page != 0U || size % host_page != 0U)
+    {
+        return Failure(RuntimeError::DeviceRangeInvalid,
+                       "device range must start on and cover whole host pages");
     }
 
     ranges_.push_back(Range{read_callback, write_callback, context, &statistics_});

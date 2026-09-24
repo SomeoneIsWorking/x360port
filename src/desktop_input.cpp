@@ -16,6 +16,8 @@ constexpr unsigned kBitsPerWord = 64;
 
 DesktopSnapshot DesktopInputState::TakeSnapshot() noexcept
 {
+    // Every bit of the key words has a key in the snapshot.
+    static_assert(kKeyWords * kBitsPerWord == decltype(DesktopSnapshot::keys){}.size());
     DesktopSnapshot snapshot;
     for (std::size_t word = 0; word < kKeyWords; ++word)
     {
@@ -24,7 +26,7 @@ DesktopSnapshot DesktopInputState::TakeSnapshot() noexcept
         {
             if ((bits >> bit & 1U) != 0U)
             {
-                snapshot.keys.set(word * kBitsPerWord + bit);
+                snapshot.keys[word * kBitsPerWord + bit] = true;
             }
         }
     }

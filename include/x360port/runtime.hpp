@@ -117,6 +117,10 @@ class RuntimeContext final : public GuestCallContext
     [[nodiscard]] RuntimeFailure
     InstallOverride(GuestAddress address, NativeOverrideHandler handler, void* context = nullptr);
     [[nodiscard]] RuntimeFailure RemoveOverride(GuestAddress address);
+    // Routes guest accesses to [address, address + size) to the callbacks. The
+    // host protects the range to catch them, so it must start on and cover
+    // whole host pages (up to 64 KB on ARM64 hosts); a range that does not is
+    // refused as DeviceRangeInvalid.
     [[nodiscard]] RuntimeFailure RegisterDeviceMemoryRange(std::uint32_t address,
                                                            std::uint32_t mask, std::uint32_t size,
                                                            DeviceReadCallback read_callback,
