@@ -9,7 +9,9 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <iostream>
+#include <new>
 #include <span>
+#include <stdexcept>
 #include <string_view>
 #include <vector>
 
@@ -62,7 +64,22 @@ ExecutionResult AddOneThroughOriginal(GuestCallContext& call, GuestAddress addre
 ExecutionResult RefuseOverride(GuestCallContext&, GuestAddress, std::span<const std::uint64_t>,
                                void*) noexcept
 {
-    return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};
+    // Building the detail string may throw bad_alloc or length_error, the two
+    // exceptions its constructor is specified to throw; the refusal then
+    // stands without its detail, which the test reports, rather than
+    // terminating inside a noexcept handler.
+    try
+    {
+        return {{RuntimeError::ExecutionFailed, "native test refusal"}, 0};
+    }
+    catch (const std::bad_alloc&)
+    {
+        return {{RuntimeError::ExecutionFailed, {}}, 0};
+    }
+    catch (const std::length_error&)
+    {
+        return {{RuntimeError::ExecutionFailed, {}}, 0};
+    }
 }
 
 [[noreturn]] void Fail(std::string_view message)
