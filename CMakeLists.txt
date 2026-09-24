@@ -315,10 +315,28 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
                 tests/warnings/probe.cpp
                 tools/xex_inspect.cpp
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    # AppleClang finds the macOS SDK itself, so CMake 4 leaves -isysroot out
+    # of the compile database; another clang driver such as clang-tidy would
+    # then find no standard headers. Name the SDK xcrun selects.
+    set(X360PORT_CLANG_TIDY_SDK_ARGS)
+    if(APPLE)
+        execute_process(
+            COMMAND xcrun --show-sdk-path
+            RESULT_VARIABLE X360PORT_SDK_RESULT
+            OUTPUT_VARIABLE X360PORT_SDK_PATH
+            ERROR_VARIABLE X360PORT_SDK_ERROR
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(NOT X360PORT_SDK_RESULT EQUAL 0 OR NOT IS_DIRECTORY "${X360PORT_SDK_PATH}")
+            message(FATAL_ERROR
+                "clang-tidy needs the macOS SDK; xcrun --show-sdk-path gave "
+                "'${X360PORT_SDK_PATH}' (${X360PORT_SDK_RESULT}): ${X360PORT_SDK_ERROR}")
+        endif()
+        set(X360PORT_CLANG_TIDY_SDK_ARGS "--extra-arg=-isysroot${X360PORT_SDK_PATH}")
+    endif()
     add_test(
         NAME clang_tidy
         COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
-                --warnings-as-errors=*
+                --warnings-as-errors=* ${X360PORT_CLANG_TIDY_SDK_ARGS}
                 ${X360PORT_VALIDATION_SOURCES}
                 tests/contract_tests.cpp
                 tests/warnings/probe.cpp
@@ -327,7 +345,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         add_test(
             NAME runtime_clang_tidy
             COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
-                    --warnings-as-errors=*
+                    --warnings-as-errors=* ${X360PORT_CLANG_TIDY_SDK_ARGS}
                     ${X360PORT_RUNTIME_SOURCES}
                     tests/desktop_input_tests.cpp
                     tests/export_name_tests.cpp
@@ -341,7 +359,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
             add_test(
                 NAME system_clang_tidy
                 COMMAND ${CLANG_TIDY_EXECUTABLE} -p=${CMAKE_BINARY_DIR}
-                        --warnings-as-errors=*
+                        --warnings-as-errors=* ${X360PORT_CLANG_TIDY_SDK_ARGS}
                         ${X360PORT_SYSTEM_SOURCES}
                         tests/frame_interval_tests.cpp
                         tests/pad_merge_tests.cpp
