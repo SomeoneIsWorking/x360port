@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -126,6 +127,12 @@ struct SystemFrameImage
 };
 
 struct SystemSessionCreateResult;
+class SystemSession;
+
+// Called once, on the emulator thread, after a windowed session's title has
+// launched. The session stays valid until the process ends, so the callee may
+// keep the reference (for example to serve a live control channel from it).
+using SystemSessionLaunched = std::function<void(const SystemSession&)>;
 
 // Execution accounting for a launched session. Every guest function runs as
 // Xenia-translated host code: the system session has no interpreter fallback,
@@ -192,7 +199,8 @@ class SystemSession final
 
   private:
     class Impl;
-    friend RuntimeFailure RunWindowedSystem(SystemSessionConfig config);
+    friend RuntimeFailure RunWindowedSystem(SystemSessionConfig config,
+                                            SystemSessionLaunched on_launched);
 
     explicit SystemSession(std::unique_ptr<Impl> impl) noexcept;
 
@@ -210,8 +218,9 @@ struct SystemSessionCreateResult
 // Runs the title in a game window on the calling thread, which must be the
 // process's main thread. Returns only when the session could not start; once
 // the title runs, the process ends when the player closes the window or the
-// title exits.
-[[nodiscard]] RuntimeFailure RunWindowedSystem(SystemSessionConfig config);
+// title exits. `on_launched`, when set, receives the running session.
+[[nodiscard]] RuntimeFailure RunWindowedSystem(SystemSessionConfig config,
+                                               SystemSessionLaunched on_launched = {});
 
 } // namespace x360port
 
