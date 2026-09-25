@@ -340,7 +340,9 @@ an identity mismatch or a refused override holds the main thread so the title ne
 `x360port_system_config_tests` requires each of eight invalid configurations (zero title
 ID, missing title path, relative storage root, either null controller reader, a null
 override handler, a display refresh of zero or above 1000 Hz) to refuse with its typed error before any Xenia owner is composed.
-`RunWindowedSystem` hosts the session in a GTK window with fullscreen toggles.
+`RunWindowedSystem` hosts the session in a GTK window with fullscreen toggles and hands the
+launched session to an optional `SystemSessionLaunched` callback, so a title can serve a live
+control channel from the player's window.
 `SystemSession::ExecutionCounts` reports the guest functions Xenia's processor has
 translated, failed to translate, and the host code they emitted, counted at
 `Processor::DemandFunction` in the pinned fork. The session has no interpreter fallback,

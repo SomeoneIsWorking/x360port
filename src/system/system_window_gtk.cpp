@@ -68,7 +68,7 @@ class FullscreenShortcut final : public xe::ui::WindowInputListener
 
 } // namespace
 
-RuntimeFailure RunWindowedSystem(SystemSessionConfig config)
+RuntimeFailure RunWindowedSystem(SystemSessionConfig config, SystemSessionLaunched on_launched)
 {
     // Xenia presents through an Xlib/XCB Vulkan surface, so a Wayland desktop
     // must give this window to Xwayland.
@@ -108,14 +108,16 @@ RuntimeFailure RunWindowedSystem(SystemSessionConfig config)
                               "the platform refused to open the game window"};
     }
 
-    auto session = std::make_unique<SystemSession::Impl>(std::move(config));
+    // Owned through the public type so `on_launched` can be handed the session.
+    SystemSession owner(std::make_unique<SystemSession::Impl>(std::move(config)));
     RuntimeFailure failure;
     std::atomic<bool> launched{false};
     // Composes and launches the console on its own thread, as Xenia requires:
     // the UI thread must keep pumping while the GPU and audio systems come up.
     // A failure is recorded for the caller and ends the UI loop.
     std::thread emulator_thread(
-        [&session = *session, &window = *window, &app_context, &failure, &launched]()
+        [&owner, &session = *owner.impl_, &window = *window, &app_context, &failure, &launched,
+         &on_launched]()
         {
             failure = session.Initialize(&window);
             if (!failure)
@@ -131,6 +133,10 @@ RuntimeFailure RunWindowedSystem(SystemSessionConfig config)
                 return;
             }
             launched.store(true, std::memory_order_release);
+            if (on_launched)
+            {
+                on_launched(owner);
+            }
             session.Emulator().WaitUntilExit();
             app_context.CallInUIThread([&app_context]() { app_context.QuitFromUIThread(); });
         });
