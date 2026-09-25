@@ -57,6 +57,10 @@ enum class SystemHostInput : std::uint8_t
 inline constexpr std::uint32_t kConsoleDisplayRefreshHz = 60;
 inline constexpr std::uint32_t kMinDisplayRefreshHz = 1;
 inline constexpr std::uint32_t kMaxDisplayRefreshHz = 1000;
+// The render-target scales along each axis a session accepts. The GPU may
+// support less; Xenia then clamps to the largest scale the device offers.
+inline constexpr std::uint32_t kMinResolutionScale = 1;
+inline constexpr std::uint32_t kMaxResolutionScale = 7;
 
 struct SystemSessionConfig
 {
@@ -98,6 +102,13 @@ struct SystemSessionConfig
     // one waits, and a later one is never delayed, so a title may run its
     // vblank fast enough that vblank pacing never rounds a slow frame up.
     std::uint32_t max_presents_per_second = 0;
+    // Integer multiple of the console's render resolution along each axis,
+    // in [kMinResolutionScale, kMaxResolutionScale]. Rendering is scaled
+    // opaquely to the title; 1 renders exactly as the console does.
+    std::uint32_t resolution_scale = kMinResolutionScale;
+    // A windowed session opens its game window fullscreen. The player can
+    // still toggle it with F11 or Alt+Enter. Ignored offscreen.
+    bool start_fullscreen = false;
     // Appends each translated guest function to /tmp/perf-<pid>.map, the
     // symbol file Linux perf reads for JIT code. Diagnostic; Linux only.
     bool write_perf_map = false;

@@ -360,6 +360,10 @@ that presents on every Nth vblank; `max_presents_per_second` caps presents on th
 instead, holding a present only when it arrives early, so a title can run its vblank fast
 without vblank pacing rounding a slow frame up to the next vblank; `write_perf_map` has the pinned fork write
 `/tmp/perf-<pid>.map` so Linux perf attributes code-cache samples to guest functions.
+`resolution_scale` (1-7, refused outside that range by `x360port_system_config_tests`) scales
+the render resolution along each axis through Xenia's draw-resolution scale, and
+`start_fullscreen` opens the GTK game window fullscreen; neither has been observed in a
+running window by an agent.
 `FrameIntervals()` snapshots the host time between guest presents in 0.1 ms buckets, from
 which a caller reports percentiles over any window (`x360port_frame_intervals`).
 

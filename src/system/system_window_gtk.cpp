@@ -98,6 +98,10 @@ RuntimeFailure RunWindowedSystem(SystemSessionConfig config)
         window->AddListener(&*desktop_input);
         window->AddInputListener(&*desktop_input, kDesktopInputZOrder);
     }
+    if (config.start_fullscreen)
+    {
+        window->SetFullscreen(true);
+    }
     if (!window->Open())
     {
         return RuntimeFailure{RuntimeError::BackendInitializationFailed,

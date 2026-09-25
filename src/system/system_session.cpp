@@ -33,6 +33,8 @@
 #include "xenia/ui/presenter.h"
 
 DECLARE_path(log_file);
+DECLARE_int32(draw_resolution_scale_x);
+DECLARE_int32(draw_resolution_scale_y);
 
 namespace x360port
 {
@@ -140,6 +142,15 @@ RuntimeFailure SystemSession::Impl::ValidateConfig() const
                            std::to_string(config_.display_refresh_hz) + " Hz, not " +
                            std::to_string(config_.max_presents_per_second));
     }
+    if (config_.resolution_scale < kMinResolutionScale ||
+        config_.resolution_scale > kMaxResolutionScale)
+    {
+        return Failure(RuntimeError::BackendInitializationFailed,
+                       "the resolution scale must be between " +
+                           std::to_string(kMinResolutionScale) + " and " +
+                           std::to_string(kMaxResolutionScale) + ", not " +
+                           std::to_string(config_.resolution_scale));
+    }
     for (const SystemOverride& entry : config_.overrides)
     {
         if (entry.handler == nullptr)
@@ -178,6 +189,8 @@ RuntimeFailure SystemSession::Impl::Initialize(xe::ui::Window* window)
     cvars::framerate_limit = config_.display_refresh_hz;
     cvars::guest_present_limit = config_.max_presents_per_second;
     cvars::perf_map = config_.write_perf_map;
+    cvars::draw_resolution_scale_x = static_cast<std::int32_t>(config_.resolution_scale);
+    cvars::draw_resolution_scale_y = static_cast<std::int32_t>(config_.resolution_scale);
 
     if (config_.audio == SystemAudio::Silent)
     {

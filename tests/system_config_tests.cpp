@@ -103,6 +103,16 @@ void RequireRefused(SystemSessionConfig config, RuntimeError expected, std::stri
                    "present limit above the display refresh");
 
     config = ValidConfig(existing);
+    config.resolution_scale = 0;
+    RequireRefused(std::move(config), RuntimeError::BackendInitializationFailed,
+                   "zero resolution scale");
+
+    config = ValidConfig(existing);
+    config.resolution_scale = kMaxResolutionScale + 1;
+    RequireRefused(std::move(config), RuntimeError::BackendInitializationFailed,
+                   "resolution scale above the maximum");
+
+    config = ValidConfig(existing);
     config.player_gamertag = "1Player";
     RequireRefused(std::move(config), RuntimeError::ModuleValidationFailed,
                    "gamertag starting with a digit");
@@ -112,7 +122,7 @@ void RequireRefused(SystemSessionConfig config, RuntimeError expected, std::stri
     RequireRefused(std::move(config), RuntimeError::ModuleValidationFailed,
                    "gamertag longer than the console allows");
 
-    std::cout << "system_config_tests: 11 invalid configs refused before composing a console\n";
+    std::cout << "system_config_tests: 13 invalid configs refused before composing a console\n";
     return EXIT_SUCCESS;
 }
 
