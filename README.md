@@ -75,3 +75,5 @@ Title adapters may request bounded caller-owned guest allocations through
 owner tracks each complete allocation and rejects writes or releases that do
 not stay within or exactly match a live range; it does not expose an
 unbounded guest-memory window or title policy.
+
+Built with AI assistance (Claude and other LLMs).
