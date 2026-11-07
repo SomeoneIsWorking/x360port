@@ -60,7 +60,7 @@ it at the image base) when requested with `--image-out`. It is an input/identity
 or provide a gameplay fallback.
 
 The required Xenia revision is
-`d77aad9116c936cf1c7a40231f210d17094bed9e` from the maintained
+`2f21dccf8c600b2424bf9a473a5e2db81cbfc35e` from the maintained
 `SomeoneIsWorking/xenia-canary` `main` branch; configuration refuses any other
 revision. `-DX360PORT_VALIDATION_ONLY=ON` builds only the synthetic diagnostic
 validator and never claims runtime capability.
